@@ -171,6 +171,7 @@ export default function CartScreen() {
                     You'll earn <Text style={{ fontWeight: 'bold' }}>{earnedPoints}</Text> Meat Points
                   </Text>
                 </View>
+              )}
 
               {isDesktop && (
                 <TouchableOpacity
@@ -183,7 +184,6 @@ export default function CartScreen() {
               )}
             </View>
           </View>
-          )}
         </View>
 
         <View style={{ height: 100 }} />

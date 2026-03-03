@@ -220,8 +220,22 @@ export default function HomeScreen() {
 
       {/* 4. Floating Cart Banner */}
       {cartItemCount > 0 && (
-        <View style={styles.floatCartContainer}>
-          <TouchableOpacity style={styles.floatCartBtn} onPress={() => router.push('/cart')}>
+        <View style={[
+          styles.floatCartContainer,
+          {
+            bottom: isTablet ? 95 : 15, // Adjust to float closely above the footer
+          }
+        ]}>
+          <TouchableOpacity
+            style={[
+              styles.floatCartBtn,
+              {
+                width: '100%',
+                maxWidth: isUltraWide ? 1000 : isDesktop ? 800 : isTablet ? 600 : '100%'
+              }
+            ]}
+            onPress={() => router.push('/cart')}
+          >
             <View style={styles.floatCartLeft}>
               <View style={styles.floatIconBg}>
                 <ShoppingBag size={20} color={Colors.deepTeal} />
@@ -725,11 +739,10 @@ const styles = StyleSheet.create({
   floatCartContainer: {
     position: 'absolute',
     bottom: 24,
-    left: 20,
-    right: 20,
-    maxWidth: 1400,
-    alignSelf: 'center',
-    width: '100%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingHorizontal: 20,
   },
   floatCartBtn: {
     backgroundColor: Colors.orange,
