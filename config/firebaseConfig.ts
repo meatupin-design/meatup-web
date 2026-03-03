@@ -15,7 +15,7 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-let app;
+let app: import('firebase/app').FirebaseApp;
 if (getApps().length === 0) {
     app = initializeApp(firebaseConfig);
 } else {
@@ -36,4 +36,4 @@ if (typeof getReactNativePersistence === 'function') {
 // Initialize Firestore
 const db = getFirestore(app);
 
-export { auth, db };
+export { app, auth, db };

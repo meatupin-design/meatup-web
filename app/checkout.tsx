@@ -23,6 +23,8 @@ import { calculateDistance, calculateDeliveryTime, STORE_LOCATION } from '@/util
 import OrderSuccessModal from '@/components/OrderSuccessModal';
 import RazorpayCheckoutGateway from '@/components/RazorpayCheckoutGateway';
 import { encode } from 'base-64';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app } from '@/config/firebaseConfig';
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -218,35 +220,18 @@ export default function CheckoutScreen() {
         console.error(error);
       }
     } else {
-      // Razorpay Online Payment Flow - Direct Client-Side API Call
+      // Razorpay Online Payment Flow - Via Firebase Cloud Function
       try {
-        const RAZORPAY_KEY_ID = process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || '';
-        const RAZORPAY_KEY_SECRET = process.env.EXPO_PUBLIC_RAZORPAY_KEY_SECRET || '';
+        // 1. Call Razorpay API via Cloud Function to avoid CORS
+        const functions = getFunctions(app);
+        const createRazorpayOrder = httpsCallable<{ amount: number, currency: string }, { id: string }>(functions, 'createRazorpayOrder');
 
-        const basicAuth = encode(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
-
-        // 1. Call Razorpay API directly from the client
-        const response = await fetch('https://api.razorpay.com/v1/orders', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Basic ${basicAuth}`,
-          },
-          body: JSON.stringify({
-            amount: Math.round(finalTotal * 100), // convert to paise
-            currency: 'INR',
-            receipt: `receipt_order_${Date.now()}`
-          })
+        const response = await createRazorpayOrder({
+          amount: finalTotal,
+          currency: 'INR'
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error("Razorpay API Error Response:", errorData);
-          throw new Error("Failed to create order on Razorpay");
-        }
-
-        const orderRes = await response.json();
-        const razorpayOrderId = orderRes.id;
+        const razorpayOrderId = response.data.id;
 
         // 2. Open WebView Gateway
         setCurrentRazorpayOrderId(razorpayOrderId);
