@@ -14,7 +14,7 @@ const razorpay = new Razorpay({
     key_secret: RAZORPAY_KEY_SECRET,
 });
 
-exports.createRazorpayOrder = onCall({ cors: ["http://localhost:3000", "http://localhost:8083", "https://meatup-f8c49.web.app", "https://meatup-f8c49.firebaseapp.com"] }, async (request) => {
+exports.createRazorpayOrder = onCall({ cors: true }, async (request) => {
     // Authentication extraction from context
     if (!request.auth) {
         throw new HttpsError(
