@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "KokoMart Web",
-    "slug": "kokomart-web",
+    "name": "MeatUp",
+    "slug": "meatup-web",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

@@ -29,7 +29,8 @@ export default function CartScreen() {
   const firstOrderDiscount = !user.is_first_order_completed ? cartTotal * 0.1 : 0;
   const finalTotal = Math.max(0, cartTotal - firstOrderDiscount);
   const earnedPoints = Math.floor(cart.reduce((sum, item) => {
-    if (item.product.unit === 'PC' || item.product.unit === 'pack') return sum;
+    const isPcUnit = item.product.unit?.toLowerCase() === 'pc' || item.product.unit?.toLowerCase() === 'pack';
+    if (isPcUnit) return sum; // Do not calculate points for piece items
     return sum + item.weight * item.quantity;
   }, 0));
 
@@ -109,7 +110,7 @@ export default function CartScreen() {
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemName} numberOfLines={1}>{item.product.name}</Text>
                       <Text style={styles.itemVariant}>
-                        {item.weight}kg {item.cuttingType ? `• ${item.cuttingType}` : ''}
+                        {item.weight}{item.product.unit?.toLowerCase() === 'pc' ? ' pc' : 'kg'} {item.cuttingType ? `• ${item.cuttingType}` : ''}
                       </Text>
                       <Text style={styles.itemPrice}>
                         ₹{(itemPrice * item.weight * item.quantity).toFixed(2)}

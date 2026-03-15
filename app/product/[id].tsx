@@ -46,15 +46,15 @@ export default function ProductDetailScreen() {
         : Colors.priceNeutral;
 
   const Icon = product.price_direction === 'up' ? TrendingUp : TrendingDown;
-  const isPcUnit = product.unit === 'PC' || product.unit === 'pack';
-  const weightOptions = isPcUnit ? [15, 30] : [0.5, 1, 2, 3, 4];
+  const isPcUnit = product.unit?.toLowerCase() === 'pc' || product.unit?.toLowerCase() === 'pack';
+  const isEgg = product.name.toLowerCase().includes('egg');
+  const weightOptions = isEgg ? [6, 12, 30] : isPcUnit ? [15, 30] : [0.5, 1, 2, 3, 4];
   const defaultWeight = weightOptions[0];
   const effectiveWeight = selectedWeight ?? defaultWeight;
   const availableToday = isProductAvailableToday(product);
 
-  const totalPrice = isPcUnit
-    ? product.current_price * quantity
-    : product.current_price * effectiveWeight * quantity;
+  const cartWeight = effectiveWeight; // Weight options are already the actual counts (6, 12, 30, etc.)
+  const totalPrice = product.current_price * cartWeight * quantity;
   const earnPoints = isPcUnit ? 0 : Math.floor(effectiveWeight * quantity);
 
   const handleAddToCartRequest = () => {
@@ -64,11 +64,6 @@ export default function ProductDetailScreen() {
       setModalVisible(true);
     } else {
       for (let i = 0; i < quantity; i++) {
-        // If it's a PC unit, we treat the 'weight' field as 1, because price is per unit/pack
-        // Or if effectiveWeight represents multiple packs, we pass that.
-        // But weightOptions in Detail is [15, 30]. So passing 15 as weight = 15x multiplier.
-        // It should pass weight = effectiveWeight / price_quantity.
-        const cartWeight = isPcUnit ? (effectiveWeight / (product.price_quantity || 1)) : effectiveWeight;
         addToCart(product.id, 1, cartWeight);
       }
       router.back();
@@ -77,7 +72,6 @@ export default function ProductDetailScreen() {
 
   const handleCuttingTypeSelect = (cuttingType: string) => {
     for (let i = 0; i < quantity; i++) {
-      const cartWeight = isPcUnit ? (effectiveWeight / (product.price_quantity || 1)) : effectiveWeight;
       addToCart(product.id, 1, cartWeight, cuttingType);
     }
     setModalVisible(false);
@@ -134,7 +128,7 @@ export default function ProductDetailScreen() {
                   <View style={styles.priceWrapper}>
                     <Text style={styles.currency}>₹</Text>
                     <Text style={styles.currentPrice}>{product.current_price}</Text>
-                    <Text style={styles.unit}>/kg</Text>
+                    <Text style={styles.unit}>/{isPcUnit ? 'pc' : product.unit}</Text>
                   </View>
 
                   {product.price_direction !== 'neutral' && (
@@ -261,6 +255,7 @@ export default function ProductDetailScreen() {
         onSelect={handleCuttingTypeSelect}
         options={product.cutting_types}
         variants={product.variants}
+        weight={cartWeight}
         title={product.variants && product.variants.length > 0 ? "Select Type" : "Select Cutting Type"}
       />
     </View>
