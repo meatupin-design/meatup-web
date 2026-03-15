@@ -20,14 +20,27 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { amount, currency } = req.body;
+    let body = req.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        return res.status(400).json({ error: 'Invalid JSON body' });
+      }
+    }
+
+    const { amount, currency } = body || {};
 
     if (!amount) {
       return res.status(400).json({ error: 'invalid-argument: The function must be called with an amount.' });
     }
 
-    const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || "";
-    const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || process.env.EXPO_PUBLIC_RAZORPAY_KEY_SECRET || "";
+    const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID;
+    const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || process.env.EXPO_PUBLIC_RAZORPAY_KEY_SECRET;
+
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+      return res.status(500).json({ error: 'Razorpay Keys are missing from Vercel Environment Variables.' });
+    }
 
     const razorpay = new Razorpay({
       key_id: RAZORPAY_KEY_ID,
@@ -50,6 +63,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error("Error creating Razorpay order:", error);
-    return res.status(500).json({ error: 'internal: Failed to create Razorpay order.' });
+    return res.status(500).json({ error: error.message || 'internal: Failed to create Razorpay order.', stack: error.stack });
   }
 }
