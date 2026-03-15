@@ -18,6 +18,7 @@ interface CuttingModalProps {
     onSelect: (variantName: string) => void;
     options?: string[];
     variants?: ProductVariant[]; // Add support for variants
+    weight?: number; // Added to calculate total price for variant quantities
     title?: string;
 }
 
@@ -29,7 +30,7 @@ const DEFAULT_CUTTING_TYPES = [
     'Minced (Keema)',
 ];
 
-export default function CuttingModal({ visible, onClose, onSelect, options, variants, title }: CuttingModalProps) {
+export default function CuttingModal({ visible, onClose, onSelect, options, variants, weight = 1, title }: CuttingModalProps) {
     const { width: windowWidth } = useWindowDimensions();
     const isLargeScreen = windowWidth >= 768;
 
@@ -55,7 +56,8 @@ export default function CuttingModal({ visible, onClose, onSelect, options, vari
 
                             <View style={styles.optionsContainer}>
                                 {variants ? (
-                                    variants.map((variant) => (
+                                    variants.map((variant) => {
+                                        return (
                                         <TouchableOpacity
                                             key={variant.name}
                                             style={styles.optionButton}
@@ -63,10 +65,11 @@ export default function CuttingModal({ visible, onClose, onSelect, options, vari
                                         >
                                             <View style={styles.optionRow}>
                                                 <Text style={styles.optionText}>{variant.name}</Text>
-                                                <Text style={styles.optionPrice}>₹{variant.price}</Text>
+                                                <Text style={styles.optionPrice}>₹{(variant.price).toFixed(2)}/pc</Text>
                                             </View>
                                         </TouchableOpacity>
-                                    ))
+                                        );
+                                    })
                                 ) : (
                                     (options && options.length > 0 ? options : DEFAULT_CUTTING_TYPES).map((type) => (
                                         <TouchableOpacity

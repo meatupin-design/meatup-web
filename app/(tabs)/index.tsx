@@ -58,23 +58,21 @@ export default function HomeScreen() {
     return () => animation.stop();
   }, [tickerPosition]);
 
-  // Data Fix for Eggs (Preserved from previous version)
+
+  // Data Fix for Eggs to revert ghost prices in DB
   useEffect(() => {
     const eggProduct = products.find(p => p.name.toLowerCase().includes('egg'));
-    if (eggProduct) {
-      const needsUpdate = !eggProduct.price_quantity || eggProduct.price_quantity === 1 || !eggProduct.variants;
-      if (needsUpdate) {
-        import('@/services/ProductService').then(({ ProductService }) => {
-          ProductService.updateProduct(eggProduct.id, {
-            price_quantity: 15,
-            unit: 'pc',
-            variants: [
-              { name: 'White Egg', price: 30 },
-              { name: 'Brown Egg', price: 40 }
-            ]
-          });
+    if (eggProduct && eggProduct.variants && eggProduct.variants.some((v: any) => v.price > 10)) {
+      import('@/services/ProductService').then(({ ProductService }) => {
+        ProductService.updateProduct(eggProduct.id, {
+          price_quantity: 6,
+          unit: 'pc',
+          variants: [
+            { name: 'White Egg', price: 6 },
+            { name: 'Brown Egg', price: 7 }
+          ]
         });
-      }
+      });
     }
   }, [products]);
 
@@ -215,6 +213,7 @@ export default function HomeScreen() {
         onSelect={handleCuttingTypeSelect}
         options={selectedProductData?.cuttingTypes}
         variants={selectedProductData?.variants}
+        weight={selectedProductData?.weight}
         title={selectedProductData?.variants ? "Select Type" : "Select Cutting Type"}
       />
 
@@ -306,21 +305,29 @@ function ProductCard({
   const availableWidth = Math.min(windowWidth, contentMaxWidth) - (horizontalPadding * 2);
   const cardWidth = numColumns > 1 ? (availableWidth - (gap * (numColumns - 1))) / numColumns : '100%';
 
+  const priceQty = product.price_quantity || 1;
+  const isPcUnit = product.unit?.toLowerCase() === 'pc' || product.unit?.toLowerCase() === 'pack';
+
   const getDefaultWeight = () => {
-    if (product.unit === 'kg') return 1;
-    if (product.unit === 'g') return 250;
+    if (product.name.toLowerCase().includes('egg')) return 6;
+    if (product.unit?.toLowerCase() === 'kg') return 0.5;
+    if (product.unit?.toLowerCase() === 'g') return 250;
+    if (isPcUnit) return 1 * priceQty;
     return 1;
   };
 
   const [selectedWeight, setSelectedWeight] = useState(getDefaultWeight());
-  const quantity = quantityInCart(selectedWeight);
-  const priceQty = product.price_quantity || 1;
+
+  // Convert display weight to cart weight
+  const cartWeight = selectedWeight; // The selected weight (6, 12, 30) is the actual count for Eggs, no need to divide here.
+  const quantity = quantityInCart(cartWeight);
 
   const getOptions = () => {
-    if (product.unit === 'kg') return [0.5, 1, 2];
-    if (product.unit === 'g') return [250, 500, 1000];
-    if (product.unit === 'PC' || product.unit === 'pack') return [1, 2];
-    return [1, 2, 4];
+    if (product.name.toLowerCase().includes('egg')) return [6, 12, 30];
+    if (product.unit?.toUpperCase() === 'KG') return [0.5, 1, 2];
+    if (product.unit?.toUpperCase() === 'G') return [250, 500, 1000];
+    if (isPcUnit) return [1 * priceQty, 2 * priceQty];
+    return [0.5, 1, 2];
   };
 
   const options = getOptions();
@@ -360,9 +367,9 @@ function ProductCard({
         {/* Variant Selector */}
         <View style={styles.variantContainer}>
           {options.map((opt) => {
-            const label = (product.unit === 'kg' || product.unit === 'g')
-              ? `${opt}${product.unit}`
-              : `${opt * priceQty} ${product.unit}`;
+            const label = isPcUnit
+              ? `${opt} ${product.unit}`
+              : `${opt} ${product.unit}`;
             const isSelected = selectedWeight === opt;
 
             return (
@@ -391,16 +398,16 @@ function ProductCard({
             </Text>
           </View>
         ) : quantity === 0 ? (
-          <TouchableOpacity style={styles.addBtn} onPress={() => onAddToCart(selectedWeight)}>
+          <TouchableOpacity style={styles.addBtn} onPress={() => onAddToCart(cartWeight)}>
             <Text style={styles.addBtnText}>ADD</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.qtyContainer}>
-            <TouchableOpacity style={styles.qtyBtn} onPress={() => onRemoveFromCart(selectedWeight)}>
+            <TouchableOpacity style={styles.qtyBtn} onPress={() => onRemoveFromCart(cartWeight)}>
               <Minus size={16} color={Colors.white} />
             </TouchableOpacity>
             <Text style={styles.qtyText}>{quantity}</Text>
-            <TouchableOpacity style={styles.qtyBtn} onPress={() => onAddToCart(selectedWeight)}>
+            <TouchableOpacity style={styles.qtyBtn} onPress={() => onAddToCart(cartWeight)}>
               <Plus size={16} color={Colors.white} />
             </TouchableOpacity>
           </View>
@@ -480,7 +487,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.deepTeal,
     fontWeight: '500',
-  },
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+  } as any,
 
   // Scroll
   scrollView: {
