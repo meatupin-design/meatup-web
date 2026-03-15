@@ -523,8 +523,7 @@ export default function CheckoutScreen() {
                   <View style={{ marginTop: 20 }}>
                     <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.charcoal, marginBottom: 12 }}>Pay Via</Text>
 
-                    {/* Online Payment Hidden as per user request */}
-                    {/* <TouchableOpacity
+                    <TouchableOpacity
                       style={[
                         styles.paymentMethodCard,
                         paymentMethod === 'online' && styles.paymentMethodCardActive
@@ -536,10 +535,10 @@ export default function CheckoutScreen() {
                       </View>
                       <Wallet size={20} color={paymentMethod === 'online' ? Colors.deepTeal : '#888'} />
                       <View style={{ marginLeft: 12 }}>
-                        <Text style={[styles.pmTitle, paymentMethod === 'online' && styles.pmTitleActive]}>Pay Online</Text>
-                        <Text style={styles.pmSub}>UPI, Cards, Wallets, NetBanking</Text>
+                        <Text style={[styles.pmTitle, paymentMethod === 'online' && styles.pmTitleActive]}>Pay via UPI</Text>
+                        <Text style={styles.pmSub}>Google Pay, PhonePe, Paytm, etc. (Secure)</Text>
                       </View>
-                    </TouchableOpacity> */}
+                    </TouchableOpacity>
 
                     <TouchableOpacity
                       style={[
