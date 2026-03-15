@@ -235,25 +235,40 @@ export default function CheckoutScreen() {
         console.error(error);
       }
     } else {
-      // Razorpay Online Payment Flow - Via Firebase Cloud Function
+      // Razorpay Online Payment Flow - Via Vercel Serverless Function
       try {
-        // 1. Call Razorpay API via Cloud Function to avoid CORS
-        const functions = getFunctions(app);
-        const createRazorpayOrder = httpsCallable<{ amount: number, currency: string }, { id: string }>(functions, 'createRazorpayOrder');
-
-        const response = await createRazorpayOrder({
-          amount: finalTotal,
-          currency: 'INR'
+        const response = await fetch('/api/createRazorpayOrder', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            amount: finalTotal,
+            currency: 'INR'
+          })
         });
 
-        const razorpayOrderId = response.data.id;
+        let responseData;
+        const rawText = await response.text();
+        
+        try {
+           responseData = JSON.parse(rawText);
+        } catch (e) {
+           throw new Error(`Server returned non-JSON response: ${rawText.substring(0, 100)}`);
+        }
+
+        if (!response.ok || responseData.error) {
+           throw new Error(responseData.error || `HTTP error! status: ${response.status}`);
+        }
+
+        const razorpayOrderId = responseData.id;
 
         // 2. Open WebView Gateway
         setCurrentRazorpayOrderId(razorpayOrderId);
         setShowRazorpayGateway(true);
 
-      } catch (error) {
-        Alert.alert('Error', 'Failed to initiate payment. Please try again.');
+      } catch (error: any) {
+        Alert.alert('Payment Initialization Failed', error.message || 'An unknown error occurred.');
         console.error("Razorpay Error:", error);
       }
     }
@@ -480,7 +495,11 @@ export default function CheckoutScreen() {
                         <Text style={styles.billItemQty}>{item.quantity}x</Text>
                         <View style={{ flex: 1, paddingHorizontal: 10 }}>
                           <Text style={styles.billItemName}>{item.product.name}</Text>
-                          <Text style={styles.billItemMeta}>{item.weight}{item.product.unit} {item.cuttingType ? `• ${item.cuttingType}` : ''}</Text>
+                          <Text style={styles.billItemMeta}>
+                            {item.product.unit === 'PC' || item.product.unit === 'pack'
+                              ? `${item.weight * (item.product.price_quantity || 1)}pc`
+                              : `${item.weight}${item.product.unit}`} {item.cuttingType ? `• ${item.cuttingType}` : ''}
+                          </Text>
                         </View>
                         <Text style={styles.billItemPrice}>
                           ₹{(itemPrice * item.quantity * item.weight).toFixed(2)}
@@ -532,8 +551,7 @@ export default function CheckoutScreen() {
                   <View style={{ marginTop: 20 }}>
                     <Text style={{ fontSize: 14, fontWeight: '600', color: Colors.charcoal, marginBottom: 12 }}>Pay Via</Text>
 
-                    {/* Online Payment Hidden as per user request */}
-                    {/* <TouchableOpacity
+                    <TouchableOpacity
                       style={[
                         styles.paymentMethodCard,
                         paymentMethod === 'online' && styles.paymentMethodCardActive
@@ -545,10 +563,10 @@ export default function CheckoutScreen() {
                       </View>
                       <Wallet size={20} color={paymentMethod === 'online' ? Colors.deepTeal : '#888'} />
                       <View style={{ marginLeft: 12 }}>
-                        <Text style={[styles.pmTitle, paymentMethod === 'online' && styles.pmTitleActive]}>Pay Online</Text>
-                        <Text style={styles.pmSub}>UPI, Cards, Wallets, NetBanking</Text>
+                        <Text style={[styles.pmTitle, paymentMethod === 'online' && styles.pmTitleActive]}>Pay via UPI</Text>
+                        <Text style={styles.pmSub}>Google Pay, PhonePe, Paytm, etc. (Secure)</Text>
                       </View>
-                    </TouchableOpacity> */}
+                    </TouchableOpacity>
 
                     <TouchableOpacity
                       style={[

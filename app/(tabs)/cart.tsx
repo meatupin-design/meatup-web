@@ -110,7 +110,9 @@ export default function CartScreen() {
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemName} numberOfLines={1}>{item.product.name}</Text>
                       <Text style={styles.itemVariant}>
-                        {item.weight}{item.product.unit?.toLowerCase() === 'pc' ? ' pc' : 'kg'} {item.cuttingType ? `• ${item.cuttingType}` : ''}
+                        {item.product.unit === 'PC' || item.product.unit === 'pack'
+                          ? `${item.weight * (item.product.price_quantity || 1)}pc`
+                          : `${item.weight}${item.product.unit}`} {item.cuttingType ? `• ${item.cuttingType}` : ''}
                       </Text>
                       <Text style={styles.itemPrice}>
                         ₹{(itemPrice * item.weight * item.quantity).toFixed(2)}
