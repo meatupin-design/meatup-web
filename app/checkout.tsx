@@ -52,6 +52,10 @@ export default function CheckoutScreen() {
   const taxRate = 0.05; // 5% for now
   const taxAmount = cartTotal * taxRate;
 
+  // Platform Fee Calculation
+  const platformFeeRate = 0.03; // 3%
+  const platformFeeAmount = cartTotal * platformFeeRate;
+
   // Delivery Charge Calculation
   const freeDistance = 7;
   const ratePerKm = 5;
@@ -61,10 +65,10 @@ export default function CheckoutScreen() {
     deliveryCharge = Math.ceil((deliveryDistance - freeDistance) * ratePerKm);
   }
 
-  const maxWalletRedemption = Math.min(user.wallet_points, cartTotal - firstOrderDiscount + taxAmount + deliveryCharge);
+  const maxWalletRedemption = Math.min(user.wallet_points, cartTotal - firstOrderDiscount + taxAmount + platformFeeAmount + deliveryCharge);
   const walletDeduction = useWalletPoints ? maxWalletRedemption : 0;
 
-  const finalTotal = Math.max(0, cartTotal + taxAmount + deliveryCharge - firstOrderDiscount - walletDeduction);
+  const finalTotal = Math.max(0, cartTotal + taxAmount + platformFeeAmount + deliveryCharge - firstOrderDiscount - walletDeduction);
 
   useEffect(() => {
     // Attempt to get location on mount if address is empty or just to check
@@ -518,6 +522,11 @@ export default function CheckoutScreen() {
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Tax ({(taxRate * 100).toFixed(0)}%)</Text>
                     <Text style={styles.summaryValue}>+₹{taxAmount.toFixed(2)}</Text>
+                  </View>
+
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Platform Fee ({(platformFeeRate * 100).toFixed(0)}%)</Text>
+                    <Text style={styles.summaryValue}>+₹{platformFeeAmount.toFixed(2)}</Text>
                   </View>
 
                   <View style={styles.summaryRow}>
