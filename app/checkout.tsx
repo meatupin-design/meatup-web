@@ -235,24 +235,27 @@ export default function CheckoutScreen() {
           })
         });
 
-        if (!response.ok) {
-           throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
+        let responseData;
+        const rawText = await response.text();
         
-        if (data.error) {
-           throw new Error(data.error);
+        try {
+           responseData = JSON.parse(rawText);
+        } catch (e) {
+           throw new Error(`Server returned non-JSON response: ${rawText.substring(0, 100)}`);
         }
 
-        const razorpayOrderId = data.id;
+        if (!response.ok || responseData.error) {
+           throw new Error(responseData.error || `HTTP error! status: ${response.status}`);
+        }
+
+        const razorpayOrderId = responseData.id;
 
         // 2. Open WebView Gateway
         setCurrentRazorpayOrderId(razorpayOrderId);
         setShowRazorpayGateway(true);
 
-      } catch (error) {
-        Alert.alert('Error', 'Failed to initiate payment. Please try again.');
+      } catch (error: any) {
+        Alert.alert('Payment Initialization Failed', error.message || 'An unknown error occurred.');
         console.error("Razorpay Error:", error);
       }
     }
