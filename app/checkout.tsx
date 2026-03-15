@@ -93,7 +93,7 @@ export default function CheckoutScreen() {
         return;
       }
 
-      let location = await Location.getCurrentPositionAsync({});
+      let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const { latitude, longitude } = location.coords;
 
       const dist = calculateDistance(
@@ -103,10 +103,14 @@ export default function CheckoutScreen() {
         STORE_LOCATION.longitude
       );
 
-      const roadDist = dist * 1.4;
-
-      setDeliveryDistance(parseFloat(roadDist.toFixed(1)));
-      setDeliveryTime(calculateDeliveryTime(dist));
+      if (dist > 20) {
+        setDeliveryDistance(null);
+        setDeliveryTime(null);
+        setLocationError('Delivery is currently unavailable in your area (Max 20km).');
+      } else {
+        setDeliveryDistance(parseFloat(dist.toFixed(1)));
+        setDeliveryTime(calculateDeliveryTime(dist));
+      }
 
       if (!address) {
         let reverseGeocode = await Location.reverseGeocodeAsync({ latitude, longitude });
@@ -156,20 +160,25 @@ export default function CheckoutScreen() {
         return;
       }
 
-      let coords = await tryGeocode(address);
+      let coords = null;
+      const pincodeMatch = address.match(/\b\d{6}\b/);
 
+      // 1. Try Geocoding with Pin Code first if present (User's source of truth)
+      if (pincodeMatch) {
+        coords = await tryGeocode(pincodeMatch[0]);
+      }
+
+      // 2. Fallback to Full Address
+      if (!coords) {
+        coords = await tryGeocode(address);
+      }
+
+      // 3. Fallback to Simplified Address if full address fails
       if (!coords) {
         const parts = address.split(',').map((p: string) => p.trim());
         if (parts.length > 2) {
           const simpleAddress = parts.slice(-3).join(', ');
           coords = await tryGeocode(simpleAddress);
-        }
-      }
-
-      if (!coords) {
-        const pincodeMatch = address.match(/\b\d{6}\b/);
-        if (pincodeMatch) {
-          coords = await tryGeocode(pincodeMatch[0]);
         }
       }
 
@@ -186,10 +195,14 @@ export default function CheckoutScreen() {
         STORE_LOCATION.longitude
       );
 
-      const roadDist = dist * 1.4;
-
-      setDeliveryDistance(parseFloat(roadDist.toFixed(1)));
-      setDeliveryTime(calculateDeliveryTime(dist));
+      if (dist > 20) {
+        setDeliveryDistance(null);
+        setDeliveryTime(null);
+        setLocationError('Delivery is currently unavailable in your area (Max 20km).');
+      } else {
+        setDeliveryDistance(parseFloat(dist.toFixed(1)));
+        setDeliveryTime(calculateDeliveryTime(dist));
+      }
 
     } catch (error) {
       setLocationError('Error calculating distance');

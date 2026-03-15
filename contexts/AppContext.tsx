@@ -168,7 +168,11 @@ export const [AppProvider, useApp] = createContextHook(() => {
           price = variant.price;
         }
       }
-      return total + (price * item.quantity * item.weight);
+      
+      const isPcUnit = item.product.unit?.toLowerCase() === 'pc' || item.product.unit?.toLowerCase() === 'pack';
+      const weightMultiplier = isPcUnit ? item.weight : item.weight; // Item.weight for PC unit is the PC count 
+      
+      return total + (price * item.quantity * weightMultiplier);
     }, 0);
   }, [cart]);
 
