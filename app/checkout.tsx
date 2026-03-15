@@ -222,18 +222,30 @@ export default function CheckoutScreen() {
         console.error(error);
       }
     } else {
-      // Razorpay Online Payment Flow - Via Firebase Cloud Function
+      // Razorpay Online Payment Flow - Via Vercel Serverless Function
       try {
-        // 1. Call Razorpay API via Cloud Function to avoid CORS
-        const functions = getFunctions(app);
-        const createRazorpayOrder = httpsCallable<{ amount: number, currency: string }, { id: string }>(functions, 'createRazorpayOrder');
-
-        const response = await createRazorpayOrder({
-          amount: finalTotal,
-          currency: 'INR'
+        const response = await fetch('/api/createRazorpayOrder', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            amount: finalTotal,
+            currency: 'INR'
+          })
         });
 
-        const razorpayOrderId = response.data.id;
+        if (!response.ok) {
+           throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.error) {
+           throw new Error(data.error);
+        }
+
+        const razorpayOrderId = data.id;
 
         // 2. Open WebView Gateway
         setCurrentRazorpayOrderId(razorpayOrderId);
