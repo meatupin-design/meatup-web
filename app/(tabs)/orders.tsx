@@ -195,7 +195,7 @@ function OrderCard({
             <Text style={styles.itemText} numberOfLines={1}>
               <Text style={{ fontWeight: '700' }}>{item.quantity}x </Text>
               {item.name}
-              <Text style={{ color: '#888' }}> ({item.weight}kg{item.cuttingType ? ` • ${item.cuttingType}` : ''})</Text>
+              <Text style={{ color: '#888' }}> ({item.weight}{item.name.toLowerCase().includes('egg') || item.unit?.toLowerCase() === 'pc' || item.unit?.toLowerCase() === 'pack' ? 'PC' : 'kg'}{item.cuttingType ? ` • ${item.cuttingType}` : ''})</Text>
             </Text>
           </View>
         ))}

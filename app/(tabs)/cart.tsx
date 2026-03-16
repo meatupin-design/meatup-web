@@ -29,7 +29,7 @@ export default function CartScreen() {
   const firstOrderDiscount = !user.is_first_order_completed ? cartTotal * 0.1 : 0;
   const finalTotal = Math.max(0, cartTotal - firstOrderDiscount);
   const earnedPoints = Math.floor(cart.reduce((sum, item) => {
-    const isPcUnit = item.product.unit?.toLowerCase() === 'pc' || item.product.unit?.toLowerCase() === 'pack';
+    const isPcUnit = item.product.unit?.toLowerCase() === 'pc' || item.product.unit?.toLowerCase() === 'pack' || item.product.name.toLowerCase().includes('egg');
     if (isPcUnit) return sum; // Do not calculate points for piece items
     return sum + item.weight * item.quantity;
   }, 0));
@@ -109,11 +109,11 @@ export default function CartScreen() {
 
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemName} numberOfLines={1}>{item.product.name}</Text>
-                      <Text style={styles.itemVariant}>
-                        {item.product.unit === 'PC' || item.product.unit === 'pack'
-                          ? `${item.weight * (item.product.price_quantity || 1)}pc`
-                          : `${item.weight}${item.product.unit}`} {item.cuttingType ? `• ${item.cuttingType}` : ''}
-                      </Text>
+                        <Text style={styles.itemVariant}>
+                          {item.product.unit?.toUpperCase() === 'PC' || item.product.unit?.toLowerCase() === 'pack' || item.product.name.toLowerCase().includes('egg')
+                            ? `${item.weight}PC`
+                            : `${item.weight}${item.product.unit}`} {item.cuttingType ? `• ${item.cuttingType}` : ''}
+                        </Text>
                       <Text style={styles.itemPrice}>
                         ₹{(itemPrice * item.weight * item.quantity).toFixed(2)}
                       </Text>

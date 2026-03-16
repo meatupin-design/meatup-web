@@ -47,7 +47,7 @@ export default function ProductDetailScreen() {
         : Colors.priceNeutral;
 
   const Icon = product.price_direction === 'up' ? TrendingUp : TrendingDown;
-  const isPcUnit = product.unit?.toLowerCase() === 'pc' || product.unit?.toLowerCase() === 'pack';
+  const isPcUnit = product.unit?.toLowerCase() === 'pc' || product.unit?.toLowerCase() === 'pack' || product.name.toLowerCase().includes('egg');
   const isEgg = product.name.toLowerCase().includes('egg');
   const weightOptions = isEgg ? [6, 12, 30] : isPcUnit ? [15, 30] : [0.5, 1, 2, 3, 4];
   const defaultWeight = weightOptions[0];
@@ -129,7 +129,7 @@ export default function ProductDetailScreen() {
                   <View style={styles.priceWrapper}>
                     <Text style={styles.currency}>₹</Text>
                     <Text style={styles.currentPrice}>{product.current_price}</Text>
-                    <Text style={styles.unit}>/{isPcUnit ? 'pc' : product.unit}</Text>
+                    <Text style={styles.unit}>/{isPcUnit ? 'PC' : product.unit}</Text>
                   </View>
 
                   {product.price_direction !== 'neutral' && (
@@ -152,7 +152,7 @@ export default function ProductDetailScreen() {
               </View>
 
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Select {isPcUnit ? 'Quantity' : 'Weight'}</Text>
+                <Text style={styles.sectionTitle}>Select {isEgg ? 'Pack Size' : isPcUnit ? 'Quantity' : 'Weight'}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weightOptions}>
                   {weightOptions.map((weight) => (
                     <TouchableOpacity
@@ -171,7 +171,7 @@ export default function ProductDetailScreen() {
                           effectiveWeight === weight && styles.weightOptionTextActive,
                         ]}
                       >
-                        {weight} {isPcUnit ? 'pc' : 'kg'}
+                        {weight} {isPcUnit ? 'PC' : 'kg'}
                       </Text>
                       {effectiveWeight === weight && <View style={styles.activeDot} />}
                     </TouchableOpacity>

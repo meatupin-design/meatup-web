@@ -224,6 +224,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
             quantity: item.quantity,
             weight: item.weight,
             price: itemPrice,
+            unit: item.product.unit,
             ...(item.cuttingType ? { cuttingType: item.cuttingType } : {}),
           };
         }),
@@ -233,7 +234,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
         wallet_used: walletUsed,
         final_amount: finalAmount,
         earned_points: Math.floor(cart.reduce((sum, item) => {
-          if (item.product.unit === 'PC' || item.product.unit === 'pack') return sum;
+          const isPcUnit = item.product.unit?.toLowerCase() === 'pc' || item.product.unit?.toLowerCase() === 'pack' || item.product.name.toLowerCase().includes('egg');
+          if (isPcUnit) return sum;
           return sum + item.weight * item.quantity;
         }, 0)),
         address,

@@ -234,7 +234,7 @@ export default function OrderDetailScreen() {
                                             <View style={{ flex: 1 }}>
                                                 <Text style={styles.itemName}>{item.name}</Text>
                                                 <Text style={styles.itemMeta}>
-                                                    {item.weight}kg{item.cuttingType ? ` • ${item.cuttingType}` : ''}
+                                                    {item.weight}{item.name.toLowerCase().includes('egg') || item.unit?.toLowerCase() === 'pc' || item.unit?.toLowerCase() === 'pack' ? 'PC' : 'kg'}{item.cuttingType ? ` • ${item.cuttingType}` : ''}
                                                 </Text>
                                             </View>
                                             <Text style={styles.itemPrice}>
