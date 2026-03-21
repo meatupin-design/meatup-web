@@ -326,7 +326,9 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 16,
         color: Colors.charcoal,
-    },
+        // @ts-ignore - outlineStyle is a web-only property
+        outlineStyle: 'none',
+    } as any,
     loginButton: {
         flexDirection: 'row',
         alignItems: 'center',
