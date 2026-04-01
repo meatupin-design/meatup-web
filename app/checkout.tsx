@@ -336,7 +336,6 @@ export default function CheckoutScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[
-          styles.scrollContent,
           isLargeScreen && styles.largeScreenContent
         ]}>
           {/* Header/Banner Section */}
@@ -716,15 +715,18 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   leftColumn: {
-    flex: 1,
+    width: '100%',
   },
   largeLeftColumn: {
-    flex: 1.6, // Allocate more space to details
+    flex: 1.6,
+    width: 'auto',
   },
   rightColumn: {
-    flex: 1,
+    width: '100%',
   },
   largeRightColumn: {
+    flex: 1,
+    width: 'auto',
     position: Platform.OS === 'web' ? 'sticky' : 'relative' as any,
     top: 20,
   },
