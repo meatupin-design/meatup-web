@@ -88,6 +88,8 @@ export default function OrderDetailScreen() {
     const StatusIcon = config.icon;
     const currentStatusIndex = ALL_STATUSES.indexOf(order.status);
     const hasPaymentId = !!order.payment_id || !!order.razorpay_order_id;
+    const isOnline = order.payment_mode === 'online' || (order.payment_mode === undefined && hasPaymentId);
+    const isCOD = order.payment_mode === 'cod' || (order.payment_mode === undefined && !hasPaymentId);
 
     const taxRate = 0;
     const taxAmount = order.total_amount * taxRate;
@@ -296,7 +298,7 @@ export default function OrderDetailScreen() {
                                 {/* Payment method row */}
                                 <View style={styles.infoRow}>
                                     <View style={styles.infoIcon}>
-                                        {hasPaymentId
+                                        {isOnline
                                             ? <CreditCard size={16} color={Colors.deepTeal} />
                                             : <Banknote size={16} color={Colors.deepTeal} />
                                         }
@@ -304,12 +306,12 @@ export default function OrderDetailScreen() {
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.infoLabel}>Payment Method</Text>
                                         <Text style={styles.infoValue}>
-                                            {hasPaymentId ? 'Online Payment (UPI)' : 'Cash on Delivery'}
+                                            {isOnline ? 'Online Payment (UPI)' : 'Cash on Delivery'}
                                         </Text>
                                     </View>
-                                    <View style={[styles.paidBadge, { backgroundColor: hasPaymentId ? '#E6F5EA' : '#FFF4E6' }]}>
-                                        <Text style={[styles.paidBadgeText, { color: hasPaymentId ? Colors.priceUp : Colors.orange }]}>
-                                            {hasPaymentId ? 'Paid' : 'COD'}
+                                    <View style={[styles.paidBadge, { backgroundColor: isOnline ? '#E6F5EA' : '#FFF4E6' }]}>
+                                        <Text style={[styles.paidBadgeText, { color: isOnline ? Colors.priceUp : Colors.orange }]}>
+                                            {isOnline ? 'Paid' : 'COD'}
                                         </Text>
                                     </View>
                                 </View>

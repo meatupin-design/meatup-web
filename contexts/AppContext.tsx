@@ -183,6 +183,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const placeOrder = async (
     address: string,
     deliverySlot: string,
+    paymentMode: 'online' | 'cod',
     walletUsed: number = 0,
     note?: string,
     deliveryCharge: number = 0,
@@ -240,6 +241,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
         }, 0)),
         address,
         delivery_slot: deliverySlot,
+        payment_mode: paymentMode,
         note,
         ...(paymentDetails ? {
           payment_id: paymentDetails.payment_id,
