@@ -17,6 +17,8 @@ export interface Product {
     increment: number;
     price_quantity?: number; // For "30 for 15 pieces" logic. Defaults to 1 if undefined.
     variants?: ProductVariant[];
+    rating?: number;
+    num_reviews?: number;
 }
 
 export interface ProductVariant {
@@ -87,4 +89,14 @@ export interface Order {
     razorpay_order_id?: string;
     tax_amount?: number;
     platform_fee?: number;
+}
+
+export interface Review {
+    id: string;
+    product_id: string;
+    user_id: string;
+    user_name: string;
+    rating: number; // 1-5
+    comment: string;
+    created_at: number;
 }

@@ -26,8 +26,7 @@ export default function CartScreen() {
   const { cart, addToCart, removeFromCart, cartTotal, user } = useApp();
   const insets = useSafeAreaInsets();
 
-  const firstOrderDiscount = !user.is_first_order_completed ? cartTotal * 0.1 : 0;
-  const finalTotal = Math.max(0, cartTotal - firstOrderDiscount);
+  const finalTotal = cartTotal;
   const earnedPoints = Math.floor(cart.reduce((sum, item) => {
     const isPcUnit = item.product.unit?.toLowerCase() === 'pc' || item.product.unit?.toLowerCase() === 'pack' || item.product.name.toLowerCase().includes('egg');
     if (isPcUnit) return sum; // Do not calculate points for piece items
@@ -80,20 +79,6 @@ export default function CartScreen() {
       >
         <View style={isDesktop ? styles.rowLayout : null}>
           <View style={isDesktop ? styles.leftColumn : null}>
-            {!user.is_first_order_completed && (
-              <View style={styles.discountBanner}>
-                <View style={styles.discountIconContainer}>
-                  <TicketPercent size={24} color={Colors.white} />
-                </View>
-                <View style={styles.discountContent}>
-                  <Text style={styles.discountTitle}>First Order Offer Applied!</Text>
-                  <Text style={styles.discountSubtitle}>
-                    You'll save 10% on this order as a welcome gift.
-                  </Text>
-                </View>
-                <Sparkles size={24} color={Colors.cream} style={{ opacity: 0.8 }} />
-              </View>
-            )}
 
             <View style={styles.cartList}>
               {cart.map((item, index) => {
@@ -153,12 +138,6 @@ export default function CartScreen() {
                 <Text style={styles.summaryValue}>₹{cartTotal.toFixed(2)}</Text>
               </View>
 
-              {firstOrderDiscount > 0 && (
-                <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, styles.discountLabel]}>First Order Discount (10%)</Text>
-                  <Text style={[styles.summaryValue, styles.discountValue]}>-₹{firstOrderDiscount.toFixed(2)}</Text>
-                </View>
-              )}
 
               <View style={styles.divider} />
 

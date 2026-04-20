@@ -46,7 +46,6 @@ export default function CheckoutScreen() {
   const [deliveryTime, setDeliveryTime] = useState<number | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
 
-  const firstOrderDiscount = !user.is_first_order_completed ? cartTotal * 0.1 : 0;
 
   // Tax Calculation
   const taxRate = 0.05; // 5% for now
@@ -65,10 +64,10 @@ export default function CheckoutScreen() {
     deliveryCharge = Math.ceil((deliveryDistance - freeDistance) * ratePerKm);
   }
 
-  const maxWalletRedemption = Math.min(user.wallet_points, cartTotal - firstOrderDiscount + taxAmount + platformFeeAmount + deliveryCharge);
+  const maxWalletRedemption = Math.min(user.wallet_points, cartTotal + taxAmount + platformFeeAmount + deliveryCharge);
   const walletDeduction = useWalletPoints ? maxWalletRedemption : 0;
 
-  const finalTotal = Math.max(0, cartTotal + taxAmount + platformFeeAmount + deliveryCharge - firstOrderDiscount - walletDeduction);
+  const finalTotal = Math.max(0, cartTotal + taxAmount + platformFeeAmount + deliveryCharge - walletDeduction);
 
   useEffect(() => {
     // Attempt to get location on mount if address is empty or just to check
@@ -228,7 +227,7 @@ export default function CheckoutScreen() {
 
     if (paymentMethod === 'cod') {
       try {
-        const result = await placeOrder(address, slotString, paymentMethod, walletDeduction, note, deliveryCharge, undefined, taxAmount, platformFeeAmount, firstOrderDiscount);
+        const result = await placeOrder(address, slotString, paymentMethod, walletDeduction, note, deliveryCharge, undefined, taxAmount, platformFeeAmount, 0);
         if (!result) throw new Error("Order placement failed");
 
         const { display_id } = result;
@@ -293,7 +292,7 @@ export default function CheckoutScreen() {
         signature: data.razorpay_signature // can be saved if needed
       };
 
-      const result = await placeOrder(address, slotString, 'online', walletDeduction, note, deliveryCharge, paymentDetails, taxAmount, platformFeeAmount, firstOrderDiscount);
+      const result = await placeOrder(address, slotString, 'online', walletDeduction, note, deliveryCharge, paymentDetails, taxAmount, platformFeeAmount, 0);
       if (!result) throw new Error("Order placement failed");
 
       const { display_id } = result;
@@ -341,20 +340,6 @@ export default function CheckoutScreen() {
           {/* Header/Banner Section */}
           <View style={isLargeScreen ? { marginBottom: 24 } : null}>
             {/* First Order Discount Banner */}
-            {firstOrderDiscount > 0 && (
-              <View style={styles.discountBanner}>
-                <View style={styles.discountIconContainer}>
-                  <TicketPercent size={24} color={Colors.white} />
-                </View>
-                <View style={styles.discountContent}>
-                  <Text style={styles.discountTitle}>First Order Offer Applied!</Text>
-                  <Text style={styles.discountSubtitle}>
-                    You'll save 10% on this order as a welcome gift.
-                  </Text>
-                </View>
-                <Sparkles size={24} color={Colors.cream} style={{ opacity: 0.8 }} />
-              </View>
-            )}
           </View>
 
           <View style={[
@@ -535,12 +520,6 @@ export default function CheckoutScreen() {
                     </Text>
                   </View>
 
-                  {firstOrderDiscount > 0 && (
-                    <View style={styles.summaryRow}>
-                      <Text style={[styles.summaryLabel, { color: Colors.priceUp }]}>New User Discount</Text>
-                      <Text style={[styles.summaryValue, { color: Colors.priceUp }]}>-₹{firstOrderDiscount.toFixed(2)}</Text>
-                    </View>
-                  )}
 
                   {useWalletPoints && walletDeduction > 0 && (
                     <View style={styles.summaryRow}>
