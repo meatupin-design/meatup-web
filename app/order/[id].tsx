@@ -91,8 +91,8 @@ export default function OrderDetailScreen() {
     const isOnline = order.payment_mode === 'online' || (order.payment_mode === undefined && hasPaymentId);
     const isCOD = order.payment_mode === 'cod' || (order.payment_mode === undefined && !hasPaymentId);
 
-    const taxRate = 0;
-    const taxAmount = order.total_amount * taxRate;
+    const taxAmount = order.tax_amount ?? 0;
+    const platformFee = order.platform_fee ?? 0;
     const deliveryCharge = order.delivery_charge ?? 0;
 
     const handleCallSupport = () => {
@@ -335,6 +335,13 @@ export default function OrderDetailScreen() {
                                     <Text style={styles.billLabel}>Tax</Text>
                                     <Text style={taxAmount === 0 ? styles.billValueFree : styles.billValue}>
                                         {taxAmount === 0 ? '₹0.00' : `+₹${taxAmount.toFixed(2)}`}
+                                    </Text>
+                                </View>
+
+                                <View style={styles.billRow}>
+                                    <Text style={styles.billLabel}>Platform Fee</Text>
+                                    <Text style={platformFee === 0 ? styles.billValueFree : styles.billValue}>
+                                        {platformFee === 0 ? '₹0.00' : `+₹${platformFee.toFixed(2)}`}
                                     </Text>
                                 </View>
 

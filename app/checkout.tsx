@@ -228,7 +228,7 @@ export default function CheckoutScreen() {
 
     if (paymentMethod === 'cod') {
       try {
-        const result = await placeOrder(address, slotString, paymentMethod, walletDeduction, note, deliveryCharge);
+        const result = await placeOrder(address, slotString, paymentMethod, walletDeduction, note, deliveryCharge, undefined, taxAmount, platformFeeAmount, firstOrderDiscount);
         if (!result) throw new Error("Order placement failed");
 
         const { display_id } = result;
@@ -293,7 +293,7 @@ export default function CheckoutScreen() {
         signature: data.razorpay_signature // can be saved if needed
       };
 
-      const result = await placeOrder(address, slotString, 'online', walletDeduction, note, deliveryCharge, paymentDetails);
+      const result = await placeOrder(address, slotString, 'online', walletDeduction, note, deliveryCharge, paymentDetails, taxAmount, platformFeeAmount, firstOrderDiscount);
       if (!result) throw new Error("Order placement failed");
 
       const { display_id } = result;

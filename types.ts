@@ -85,4 +85,6 @@ export interface Order {
     payment_mode: 'online' | 'cod';
     payment_id?: string;
     razorpay_order_id?: string;
+    tax_amount?: number;
+    platform_fee?: number;
 }

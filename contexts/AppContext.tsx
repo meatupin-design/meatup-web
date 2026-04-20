@@ -187,7 +187,10 @@ export const [AppProvider, useApp] = createContextHook(() => {
     walletUsed: number = 0,
     note?: string,
     deliveryCharge: number = 0,
-    paymentDetails?: { payment_id: string; razorpay_order_id: string }
+    paymentDetails?: { payment_id: string; razorpay_order_id: string },
+    taxAmount: number = 0,
+    platformFee: number = 0,
+    discount: number = 0
   ) => {
     if (!user.id) return;
     if (walletUsed > user.wallet_points) {
@@ -196,16 +199,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
     try {
       const subtotal = cartTotal;
-      const discount = 0; // Implement discount logic if needed
-      // Note: firstOrderDiscount is calculated in checkout, so we might need to pass finalAmount directly or recalculate here.
-      // However, current implementation seems to calculate `finalAmount` internally.
-      // Let's assume for now that standard discount logic is handled differently or we are just persisting values.
-      // But based on Checkout.tsx: `finalTotal = cartTotal + tax - discount - wallet + delivery`.
-      // The `placeOrder` function calculates `finalAmount = subtotal - discount - walletUsed`. This is missing tax and deliveryCharge.
-      // We should update `finalAmount` calculation here to be accurate or accept it as parameter.
-      // For minimal invasive change, let's update calculation here to include deliveryCharge.
-
-      const finalAmount = subtotal - discount - walletUsed + deliveryCharge;
+      const finalAmount = subtotal + taxAmount + platformFee + deliveryCharge - discount - walletUsed;
 
       // Chicken Points: 1 point per 1 kg (total weight)
       // ... existing code ...
@@ -231,6 +225,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
         }),
         total_amount: subtotal,
         discount,
+        tax_amount: taxAmount,
+        platform_fee: platformFee,
         delivery_charge: deliveryCharge, // Added field
         wallet_used: walletUsed,
         final_amount: finalAmount,
@@ -259,7 +255,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
       }
 
       clearCart();
-      return result;
       return result;
     } catch (e) {
       console.error("Order Failed", e);
