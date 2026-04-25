@@ -38,7 +38,7 @@ export default function OrdersScreen() {
   const isTablet = windowWidth >= 768;
   const contentMaxWidth = 1200;
 
-  const { orders, cancelOrder } = useApp();
+  const { orders, cancelOrder, setIsSignInModalVisible, user } = useApp();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [chatVisible, setChatVisible] = React.useState(false);
@@ -46,6 +46,10 @@ export default function OrdersScreen() {
   const [selectedOrderId, setSelectedOrderId] = React.useState<string | null>(null);
 
   const handleSupportPress = () => {
+    if (user.id === '1') {
+      setIsSignInModalVisible(true);
+      return;
+    }
     setChatVisible(true);
   };
 

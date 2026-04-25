@@ -10,6 +10,7 @@ import {
   Platform,
   StatusBar,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -23,7 +24,7 @@ export default function CartScreen() {
   const contentMaxWidth = 1200;
 
   const router = useRouter();
-  const { cart, addToCart, removeFromCart, cartTotal, user } = useApp();
+  const { cart, addToCart, removeFromCart, cartTotal, user, setIsSignInModalVisible } = useApp();
   const insets = useSafeAreaInsets();
 
   const finalTotal = cartTotal;
@@ -32,6 +33,14 @@ export default function CartScreen() {
     if (isPcUnit) return sum; // Do not calculate points for piece items
     return sum + item.weight * item.quantity;
   }, 0));
+
+  const handleCheckout = () => {
+    if (user.id === '1') {
+      setIsSignInModalVisible(true);
+      return;
+    }
+    router.push('/checkout');
+  };
 
   // Custom Header Component
   const renderHeader = () => (
@@ -158,7 +167,7 @@ export default function CartScreen() {
               {isDesktop && (
                 <TouchableOpacity
                   style={[styles.checkoutBtn, { marginTop: 24 }]}
-                  onPress={() => router.push('/checkout')}
+                  onPress={handleCheckout}
                 >
                   <Text style={styles.checkoutBtnText}>Checkout</Text>
                   <ArrowRight size={20} color={Colors.white} />
@@ -180,7 +189,7 @@ export default function CartScreen() {
             </View>
             <TouchableOpacity
               style={styles.checkoutBtn}
-              onPress={() => router.push('/checkout')}
+              onPress={handleCheckout}
             >
               <Text style={styles.checkoutBtnText}>Checkout</Text>
               <ArrowRight size={20} color={Colors.white} />

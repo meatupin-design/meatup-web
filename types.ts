@@ -26,6 +26,12 @@ export interface ProductVariant {
     price: number;
 }
 
+export interface UserAddress {
+    id: string;
+    label: string; // e.g. "Home", "Office"
+    details: string; // The full address string
+}
+
 export interface UserProfile {
     id: string; // Firebase Auth UID
     name: string;
@@ -35,6 +41,7 @@ export interface UserProfile {
     wallet_points: number;
     created_at: number; // Timestamp
     address?: string;
+    addresses?: UserAddress[];
 }
 
 export type User = UserProfile;

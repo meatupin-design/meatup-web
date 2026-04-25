@@ -4,23 +4,32 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { AppProvider } from "@/contexts/AppContext";
+import { AppProvider, useApp } from "@/contexts/AppContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import SignInPromptModal from "@/components/SignInPromptModal";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
+  const { isSignInModalVisible, setIsSignInModalVisible } = useApp();
+
   return (
-    <Stack screenOptions={{ headerBackTitle: "Back" }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+    <>
+      <Stack screenOptions={{ headerBackTitle: "Back" }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="product/[id]" options={{ title: "Product Details" }} />
       <Stack.Screen name="checkout" options={{ title: "Checkout" }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="signup" options={{ headerShown: false }} />
       <Stack.Screen name="phone-login" options={{ headerShown: false }} />
     </Stack>
+    <SignInPromptModal 
+      visible={isSignInModalVisible} 
+      onClose={() => setIsSignInModalVisible(false)} 
+    />
+    </>
   );
 }
 

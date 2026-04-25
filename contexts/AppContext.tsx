@@ -25,6 +25,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const ordersRef = useRef<Order[]>([]); // Ref to track orders for interval without stale closures
   const [walletHistory, setWalletHistory] = useState<WalletTransaction[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [isSignInModalVisible, setIsSignInModalVisible] = useState(false);
 
   // Keep ref in sync
   useEffect(() => {
@@ -51,6 +52,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
               is_first_order_completed: profile.is_first_order_completed,
               wallet_points: profile.wallet_points,
               created_at: profile.created_at,
+              addresses: profile.addresses || [],
             });
           }
         });
@@ -275,6 +277,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     products,
     cartTotal,
     cartItemCount,
+    isSignInModalVisible,
+    setIsSignInModalVisible,
     addToCart,
     removeFromCart,
     updateCartItemPrice,
@@ -284,6 +288,27 @@ export const [AppProvider, useApp] = createContextHook(() => {
       if (!user.id) return;
       await UserService.updateUser(user.id, data);
       setUser((prev: User) => ({ ...prev, ...data }));
+    },
+    addAddress: async (label: string, details: string) => {
+      if (!user.id) return;
+      const newAddress = { id: Date.now().toString(), label, details };
+      const updatedAddresses = [...(user.addresses || []), newAddress];
+      await UserService.updateUser(user.id, { addresses: updatedAddresses });
+      setUser((prev: User) => ({ ...prev, addresses: updatedAddresses }));
+    },
+    removeAddress: async (addressId: string) => {
+      if (!user.id) return;
+      const updatedAddresses = (user.addresses || []).filter(a => a.id !== addressId);
+      await UserService.updateUser(user.id, { addresses: updatedAddresses });
+      setUser((prev: User) => ({ ...prev, addresses: updatedAddresses }));
+    },
+    updateAddress: async (addressId: string, label: string, details: string) => {
+      if (!user.id) return;
+      const updatedAddresses = (user.addresses || []).map(a => 
+        a.id === addressId ? { ...a, label, details } : a
+      );
+      await UserService.updateUser(user.id, { addresses: updatedAddresses });
+      setUser((prev: User) => ({ ...prev, addresses: updatedAddresses }));
     },
     cancelOrder: async (orderId: string) => {
       const order = orders.find(o => o.id === orderId);

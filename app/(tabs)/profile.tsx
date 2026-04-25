@@ -22,6 +22,9 @@ import {
   ChevronLeft,
   LogOut,
   LogIn,
+  Plus,
+  Trash2,
+  PlusCircle,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import Colors from '@/constants/colors';
@@ -35,10 +38,15 @@ export default function ProfileScreen() {
   const contentMaxWidth = 1100;
 
   const router = useRouter();
-  const { user, walletHistory, updateUserProfile } = useApp();
+  const { user, walletHistory, updateUserProfile, addAddress, removeAddress } = useApp();
   const insets = useSafeAreaInsets();
   const { logout } = useAuth();
   const [isEditing, setIsEditing] = React.useState(false);
+
+  // Address Form State
+  const [showAddressForm, setShowAddressForm] = React.useState(false);
+  const [newAddrLabel, setNewAddrLabel] = React.useState('Home');
+  const [newAddrDetails, setNewAddrDetails] = React.useState('');
 
   // Edit State
   const [editName, setEditName] = React.useState(user.name);
@@ -265,6 +273,92 @@ export default function ProfileScreen() {
               </View>
             </View>
 
+            {/* My Addresses Section */}
+            {!isGuest && (
+              <View style={styles.sectionContainer}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>My Addresses</Text>
+                  <TouchableOpacity 
+                    style={styles.addButton} 
+                    onPress={() => setShowAddressForm(!showAddressForm)}
+                  >
+                    <Plus size={18} color={Colors.deepTeal} />
+                  </TouchableOpacity>
+                </View>
+
+                {showAddressForm && (
+                  <View style={styles.addressForm}>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.miniLabel}>Label (e.g. Home, Work)</Text>
+                      <TextInput
+                        style={styles.miniInput}
+                        value={newAddrLabel}
+                        onChangeText={setNewAddrLabel}
+                        placeholder="Home"
+                      />
+                    </View>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.miniLabel}>Full Address</Text>
+                      <TextInput
+                        style={[styles.miniInput, { height: 80, textAlignVertical: 'top' }]}
+                        value={newAddrDetails}
+                        onChangeText={setNewAddrDetails}
+                        multiline
+                        placeholder="House No, Street, Landmark..."
+                      />
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.confirmAddBtn}
+                      onPress={async () => {
+                        if (newAddrDetails.trim()) {
+                          await addAddress(newAddrLabel, newAddrDetails);
+                          setNewAddrDetails('');
+                          setShowAddressForm(false);
+                        }
+                      }}
+                    >
+                      <Text style={styles.confirmAddBtnText}>Add Address</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                <View style={styles.infoCard}>
+                  {(() => {
+                    const displayAddresses = [
+                      ...(user.address ? [{ id: 'primary', label: 'Primary', details: user.address }] : []),
+                      ...(user.addresses || [])
+                    ].filter((v, i, a) => a.findIndex(t => t.details === v.details) === i);
+
+                    if (displayAddresses.length > 0) {
+                      return displayAddresses.map((addr, idx) => (
+                        <View key={addr.id}>
+                          <View style={styles.addressRow}>
+                            <View style={styles.addressIconBg}>
+                              <MapPin size={18} color={Colors.deepTeal} />
+                            </View>
+                            <View style={styles.addressInfo}>
+                              <Text style={styles.addressLabel}>{addr.label}</Text>
+                              <Text style={styles.addressDetails}>{addr.details}</Text>
+                            </View>
+                            {addr.id !== 'primary' && (
+                              <TouchableOpacity 
+                                onPress={() => removeAddress(addr.id)}
+                                style={styles.deleteAddrBtn}
+                              >
+                                <Trash2 size={18} color={Colors.priceDown} />
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                          {idx < displayAddresses.length - 1 && <View style={styles.divider} />}
+                        </View>
+                      ));
+                    }
+                    return <Text style={styles.emptyText}>No addresses added yet.</Text>
+                  })()}
+                </View>
+              </View>
+            )}
+
             {/* Transaction History */}
             {walletHistory.length > 0 && (
               <View style={styles.sectionContainer}>
@@ -312,6 +406,10 @@ export default function ProfileScreen() {
               </View>
             )}
           </View>
+        </View>
+
+        <View style={styles.footerContact}>
+          <Text style={styles.footerContactText}>Contact: +918281626692</Text>
         </View>
 
         <View style={{ height: 40 }} />
@@ -644,5 +742,103 @@ const styles = StyleSheet.create({
   },
   rightColumn: {
     flex: 1.8,
+  },
+  footerContact: {
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 10,
+    opacity: 0.6,
+  },
+  footerContactText: {
+    fontSize: 13,
+    color: Colors.deepTeal,
+    fontWeight: '600',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  addButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.deepTeal.substring(0, 7) + '10',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addressForm: {
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.deepTeal.substring(0, 7) + '20',
+  },
+  miniLabel: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 4,
+    fontWeight: '600',
+  },
+  miniInput: {
+    backgroundColor: '#F9F9F9',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: Colors.charcoal,
+    borderWidth: 1,
+    borderColor: '#EEE',
+  },
+  confirmAddBtn: {
+    backgroundColor: Colors.deepTeal,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  confirmAddBtnText: {
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  addressIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  addressInfo: {
+    flex: 1,
+  },
+  addressLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.charcoal,
+    marginBottom: 2,
+  },
+  addressDetails: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+  },
+  deleteAddrBtn: {
+    padding: 8,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#999',
+    fontSize: 14,
+    paddingVertical: 20,
   },
 });
