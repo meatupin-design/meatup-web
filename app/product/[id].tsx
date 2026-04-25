@@ -68,7 +68,7 @@ export default function ProductDetailScreen() {
   const isPcUnit = product.unit?.toLowerCase() === 'pc' || product.unit?.toLowerCase() === 'pack' || product.name.toLowerCase().includes('egg');
   const isEgg = product.name.toLowerCase().includes('egg');
   const weightOptions = isEgg ? [6, 12, 30] : isPcUnit ? [15, 30] : [0.5, 1, 2, 3, 4];
-  const defaultWeight = weightOptions[0];
+  const defaultWeight = weightOptions.includes(1) ? 1 : weightOptions[0];
   const effectiveWeight = selectedWeight ?? defaultWeight;
   const availableToday = isProductAvailableToday(product);
 

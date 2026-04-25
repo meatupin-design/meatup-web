@@ -213,13 +213,18 @@ export const [AppProvider, useApp] = createContextHook(() => {
             const variant = item.product.variants.find(v => v.name === item.cuttingType);
             if (variant) itemPrice = variant.price;
           }
+
+          const isKgUnit = item.product.unit?.toLowerCase() === 'kg';
+          const effectivePrice = isKgUnit ? itemPrice * item.weight : itemPrice;
+
           return {
             product_id: item.product.id,
             name: item.product.name,
             quantity: item.quantity,
             weight: item.weight,
-            price: itemPrice,
+            price: effectivePrice, // Now stores price for the selected weight
             unit: item.product.unit,
+            price_per_selection: true, // Flag for backward compatibility
             ...(item.cuttingType ? { cuttingType: item.cuttingType } : {}),
           };
         }),

@@ -40,6 +40,7 @@ const INITIAL_OPTIONS = [
 
 export default function SupportChatModal({ visible, onClose }: SupportChatModalProps) {
     const [messages, setMessages] = useState<Message[]>([]);
+    const [inputText, setInputText] = useState('');
     const scrollViewRef = useRef<ScrollView>(null);
     const { width: windowWidth } = useWindowDimensions();
     const isLargeScreen = windowWidth >= 768;
@@ -58,6 +59,31 @@ export default function SupportChatModal({ visible, onClose }: SupportChatModalP
             ]);
         }
     }, [visible]);
+
+    const handleSend = () => {
+        if (!inputText.trim()) return;
+
+        const userMsg: Message = {
+            id: Date.now().toString(),
+            text: inputText.trim(),
+            sender: 'user',
+            type: 'text',
+        };
+
+        setMessages((prev) => [...prev, userMsg]);
+        setInputText('');
+
+        // Simulate bot response
+        setTimeout(() => {
+            const botResponse: Message = {
+                id: (Date.now() + 1).toString(),
+                text: "Thank you for your message. Our team has been notified and will get back to you shortly. You can also use the quick options for immediate answers.",
+                sender: 'bot',
+                type: 'text',
+            };
+            setMessages((prev) => [...prev, botResponse]);
+        }, 800);
+    };
 
     const handleOptionSelect = (option: { label: string; value: string }) => {
         // Add user message
@@ -168,13 +194,17 @@ export default function SupportChatModal({ visible, onClose }: SupportChatModalP
     if (!visible) return null;
 
     return (
-        <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" transparent={isLargeScreen}>
-            <View style={isLargeScreen ? styles.modalOverlay : null}>
-                <SafeAreaView style={[styles.container, isLargeScreen && styles.largeContainer]}>
+        <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" transparent={isLargeScreen} onRequestClose={onClose}>
+            <View style={[styles.modalWrapper, isLargeScreen && styles.modalOverlay]}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={[styles.container, isLargeScreen && styles.largeContainer]}
+                >
+                    <SafeAreaView style={styles.safeArea}>
                     {/* Header */}
                     <View style={styles.header}>
-                        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                            <ChevronLeft size={28} color={Colors.charcoal} />
+                        <TouchableOpacity onPress={onClose} style={styles.headerSide}>
+                            <ChevronLeft size={28} color={Colors.cream} />
                         </TouchableOpacity>
                         <View style={styles.headerTitleContainer}>
                             <Text style={styles.headerTitle}>Support Chat</Text>
@@ -183,7 +213,7 @@ export default function SupportChatModal({ visible, onClose }: SupportChatModalP
                                 <Text style={styles.onlineText}>Online</Text>
                             </View>
                         </View>
-                        <View style={{ width: 28 }} />
+                        <View style={styles.headerSide} />
                     </View>
 
                     {/* Chat Area */}
@@ -204,7 +234,7 @@ export default function SupportChatModal({ visible, onClose }: SupportChatModalP
                                     </View>
                                 )}
 
-                                <View>
+                                <View style={styles.messageContent}>
                                     <View style={[
                                         styles.messageBubble,
                                         msg.sender === 'user' ? styles.userBubble : styles.botBubble
@@ -236,7 +266,30 @@ export default function SupportChatModal({ visible, onClose }: SupportChatModalP
                             </View>
                         ))}
                     </ScrollView>
-                </SafeAreaView>
+
+                    {/* Input Footer */}
+                    <View style={styles.inputFooter}>
+                        <View style={styles.inputContainer}>
+                            <TextInput
+                                style={styles.textInput}
+                                placeholder="Type a message..."
+                                placeholderTextColor="#999"
+                                value={inputText}
+                                onChangeText={setInputText}
+                                multiline
+                                maxHeight={100}
+                            />
+                            <TouchableOpacity 
+                                style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]} 
+                                onPress={handleSend}
+                                disabled={!inputText.trim()}
+                            >
+                                <Send size={20} color={Colors.white} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                    </SafeAreaView>
+                </KeyboardAvoidingView>
             </View>
         </Modal>
     );
@@ -247,32 +300,44 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#F9F9F9',
     },
-    modalOverlay: {
+    modalWrapper: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    modalOverlay: {
+        backgroundColor: 'rgba(0,0,0,0.6)',
         justifyContent: 'center',
         alignItems: 'center',
     },
+    safeArea: {
+        flex: 1,
+    },
     largeContainer: {
-        maxWidth: 600,
-        maxHeight: '80%',
-        width: '90%',
+        maxWidth: 500,
+        maxHeight: '85%',
+        width: '95%',
         borderRadius: 24,
         overflow: 'hidden',
+        backgroundColor: Colors.white,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        elevation: 10,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 14,
         backgroundColor: Colors.deepTeal,
         borderBottomWidth: 1,
-        borderBottomColor: Colors.deepTeal,
+        borderBottomColor: 'rgba(255,255,255,0.1)',
     },
-    closeBtn: {
-        padding: 4,
-        color: Colors.cream,
+    headerSide: {
+        width: 48,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitleContainer: {
         alignItems: 'center',
@@ -310,7 +375,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'flex-end',
         gap: 8,
-        maxWidth: '85%',
+        maxWidth: '92%',
+    },
+    messageContent: {
+        flexShrink: 1,
     },
     userMessageWrapper: {
         alignSelf: 'flex-end',
@@ -320,12 +388,13 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',
     },
     botAvatar: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         backgroundColor: Colors.deepTeal,
         alignItems: 'center',
         justifyContent: 'center',
+        marginBottom: 2, // Slight lift
     },
     messageBubble: {
         paddingHorizontal: 16,
@@ -357,19 +426,64 @@ const styles = StyleSheet.create({
         marginTop: 10,
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
     },
     optionButton: {
         backgroundColor: Colors.white,
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        borderRadius: 20,
-        borderWidth: 1,
+        paddingVertical: 10,
+        paddingHorizontal: 18,
+        borderRadius: 22,
+        borderWidth: 1.5,
         borderColor: Colors.tealBlue,
+        shadowColor: Colors.tealBlue,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+        marginRight: 8,
+        marginBottom: 8,
     },
     optionText: {
         color: Colors.tealBlue,
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '600',
+    },
+    inputFooter: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: Colors.white,
+        borderTopWidth: 1,
+        borderTopColor: '#EEE',
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        gap: 10,
+        backgroundColor: '#F5F5F5',
+        borderRadius: 24,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderWidth: 1,
+        borderColor: '#EFEFEF',
+    },
+    textInput: {
+        flex: 1,
+        fontSize: 15,
+        color: Colors.charcoal,
+        paddingTop: Platform.OS === 'ios' ? 8 : 4,
+        paddingBottom: Platform.OS === 'ios' ? 8 : 4,
+        maxHeight: 100,
+        ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+    } as any,
+    sendBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: Colors.deepTeal,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 2,
+    },
+    sendBtnDisabled: {
+        backgroundColor: '#CCC',
     },
 });

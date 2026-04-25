@@ -310,7 +310,7 @@ function ProductCard({
 
   const getDefaultWeight = () => {
     if (product.name.toLowerCase().includes('egg')) return 6;
-    if (product.unit?.toLowerCase() === 'kg') return 0.5;
+    if (product.unit?.toLowerCase() === 'kg') return 1;
     if (product.unit?.toLowerCase() === 'g') return 250;
     if (isPcUnit) return 1 * priceQty;
     return 1;

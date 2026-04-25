@@ -240,7 +240,9 @@ export default function OrderDetailScreen() {
                                                 </Text>
                                             </View>
                                             <Text style={styles.itemPrice}>
-                                                ₹{(item.price * item.weight * item.quantity).toFixed(2)}
+                                                ₹{((item as any).price_per_selection 
+                                                    ? item.price * item.quantity 
+                                                    : item.price * item.weight * item.quantity).toFixed(2)}
                                             </Text>
                                         </View>
                                         {index < order.items.length - 1 && <View style={styles.itemDivider} />}
