@@ -16,12 +16,18 @@ const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const TWILIO_WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM;
 const ADMIN_WHATSAPP_NUMBER = process.env.ADMIN_WHATSAPP_NUMBER;
 
-const razorpay = new Razorpay({
-    key_id: RAZORPAY_KEY_ID,
-    key_secret: RAZORPAY_KEY_SECRET,
-});
+let razorpay;
+if (RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET) {
+    razorpay = new Razorpay({
+        key_id: RAZORPAY_KEY_ID,
+        key_secret: RAZORPAY_KEY_SECRET,
+    });
+}
 
-const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+let client;
+if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
+    client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+}
 
 /**
  * Triggered when a new order is created in Firestore.
@@ -65,13 +71,16 @@ exports.onOrderCreated = onDocumentCreated("orders/{orderId}", async (event) => 
         const fullMessage = `${messageHeader}\n\n${messageBody}${messageFooter}`;
 
         // 4. Send via Twilio
-        await client.messages.create({
-            from: TWILIO_WHATSAPP_FROM,
-            to: ADMIN_WHATSAPP_NUMBER,
-            body: fullMessage,
-        });
-
-        logger.info(`WhatsApp notification successfully sent for order ${orderId}`);
+        if (client && TWILIO_WHATSAPP_FROM && ADMIN_WHATSAPP_NUMBER) {
+            await client.messages.create({
+                from: TWILIO_WHATSAPP_FROM,
+                to: ADMIN_WHATSAPP_NUMBER,
+                body: fullMessage,
+            });
+            logger.info(`WhatsApp notification successfully sent for order ${orderId}`);
+        } else {
+            logger.warn("Twilio client not initialized. Skipping WhatsApp notification.");
+        }
     } catch (error) {
         logger.error("Failed to send WhatsApp notification:", error);
     }
@@ -102,6 +111,9 @@ exports.createRazorpayOrder = onCall({ cors: true }, async (request) => {
     };
 
     try {
+        if (!razorpay) {
+            throw new HttpsError("failed-precondition", "Razorpay is not configured on the server.");
+        }
         const order = await razorpay.orders.create(options);
         logger.info("Razorpay Order Created", { orderId: order.id });
         return {

@@ -9,7 +9,7 @@
         "logs": "npx firebase-tools functions:log"
     },
     "engines": {
-        "node": "18"
+        "node": "20"
     },
     "main": "index.js",
     "dependencies": {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     StyleSheet,
     Text,
@@ -14,31 +14,39 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Mail, Lock, User, ArrowRight, Phone, MapPin } from 'lucide-react-native';
+import { Mail, Lock, User, ArrowRight, Phone, MapPin, ChevronLeft } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBanner from '@/components/StatusBanner';
+import { RecaptchaVerifier, ConfirmationResult } from 'firebase/auth';
+import { auth } from '@/config/firebaseConfig';
+import OTPInput from '@/components/OTPInput';
 
 export default function SignupScreen() {
     const { width: windowWidth } = useWindowDimensions();
     const isLargeScreen = windowWidth >= 768;
 
     const router = useRouter();
-    const { signUp } = useAuth();
+    const { user, signInWithPhone, createProfile } = useAuth();
+    
+    // Auth Flow State
+    const [step, setStep] = useState<'phone' | 'otp' | 'details'>('phone');
+    const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+    const recaptchaVerifier = useRef<RecaptchaVerifier | null>(null);
+
+    // Profile State
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
-    // Split Address Fields
+    
+    // Address Fields
     const [houseDetails, setHouseDetails] = useState('');
     const [landmark, setLandmark] = useState('');
     const [place, setPlace] = useState('');
     const [city, setCity] = useState('');
-    const [state, setState] = useState('Kerala'); // Default state
+    const [state, setState] = useState('Kerala');
     const [pincode, setPincode] = useState('');
 
-    // const [address, setAddress] = useState(''); // Removed simple address state
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
     // Banner State
@@ -46,36 +54,111 @@ export default function SignupScreen() {
     const [bannerType, setBannerType] = useState<'success' | 'error'>('success');
     const [bannerMessage, setBannerMessage] = useState('');
 
-    const handleSignup = async () => {
-        if (!name || !email || !password || !phone || !houseDetails || !landmark || !place || !city || !pincode) {
-            showBanner('error', 'Please fill in all fields.');
-            return;
-        }
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            const initRecaptcha = () => {
+                try {
+                    const container = document.getElementById('recaptcha-container');
+                    if (!container) {
+                        // DOM not ready yet, retry in a bit
+                        setTimeout(initRecaptcha, 200);
+                        return;
+                    }
 
-        if (password !== confirmPassword) {
-            showBanner('error', 'Passwords do not match.');
+                    if (!recaptchaVerifier.current) {
+                        console.log("[Signup] Initializing RecaptchaVerifier...");
+                        recaptchaVerifier.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
+                            size: 'normal',
+                        });
+                        recaptchaVerifier.current.render();
+                    }
+                } catch (e) {
+                    console.error("Recaptcha Init Error", e);
+                }
+            };
+
+            const timer = setTimeout(initRecaptcha, 500);
+            return () => clearTimeout(timer);
+        }
+    }, []);
+
+    const handleSendOTP = async () => {
+        if (!phone || phone.length < 10) {
+            showBanner('error', 'Please enter a valid 10-digit phone number.');
             return;
         }
 
         setIsLoading(true);
-        // Combine address fields
+        try {
+            const formattedPhone = `+91${phone}`;
+            
+            if (!recaptchaVerifier.current && Platform.OS === 'web') {
+                showBanner('error', 'System loading. Please wait.');
+                setIsLoading(false);
+                return;
+            }
+
+            const result = await signInWithPhone(formattedPhone, recaptchaVerifier.current!);
+            setConfirmationResult(result);
+            setStep('otp');
+            showBanner('success', 'OTP sent to your phone.');
+        } catch (e: any) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleVerifyOTP = async (otpCode: string) => {
+        if (!confirmationResult) return;
+
+        setIsLoading(true);
+        try {
+            const result = await confirmationResult.confirm(otpCode);
+            if (result.user) {
+                // Phone verified.
+                setStep('details');
+                showBanner('success', 'Phone verified! Please complete your profile.');
+            }
+        } catch (e: any) {
+            showBanner('error', 'Invalid verification code.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleCompleteSignup = async () => {
+        if (!name || !houseDetails || !landmark || !place || !city || !pincode) {
+            showBanner('error', 'Please fill in all required fields.');
+            return;
+        }
+
+        if (!user) return;
+
+        setIsLoading(true);
         const formattedAddress = `${houseDetails}, ${landmark}, ${place}, ${city}, ${state} - ${pincode}`;
 
         try {
-            await signUp(email, password, name, phone, formattedAddress, true); // Silent sign-up
+            await createProfile(user.uid, {
+                name,
+                email,
+                phone: user.phoneNumber || `+91${phone}`,
+                address: formattedAddress
+            });
             showBanner('success', 'Account created successfully!');
             setTimeout(() => {
                 router.replace('/(tabs)');
             }, 1500);
         } catch (e: any) {
-            let msg = "Failed to sign up.";
-            if (e.code === 'auth/email-already-in-use') msg = "Email already in use.";
-            if (e.code === 'auth/weak-password') msg = "Password is too weak.";
-            showBanner('error', msg);
+            console.error(e);
+            showBanner('error', 'Failed to create profile.');
         } finally {
             setIsLoading(false);
         }
     };
+    
+    // Actually, I'll update AuthContext.tsx to allow separate verification and profile creation.
+    // But for now, let's just make the UI work.
 
     const showBanner = (type: 'success' | 'error', message: string) => {
         setBannerType(type);
@@ -91,6 +174,9 @@ export default function SignupScreen() {
                 message={bannerMessage}
                 onClose={() => setBannerVisible(false)}
             />
+            
+            {/* Recaptcha container is now managed dynamically in document.body */}
+
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
@@ -103,159 +189,187 @@ export default function SignupScreen() {
                     showsVerticalScrollIndicator={false}
                 >
                     <Image source={require('@/assets/images/logo.png')} style={styles.logo} />
-                    <Text style={styles.tagline}>Create Your Account</Text>
-
+                    
                     <View style={styles.form}>
-                        <Text style={styles.header}>Sign Up</Text>
+                        {step === 'phone' && (
+                            <>
+                                <Text style={styles.header}>Sign Up</Text>
+                                <Text style={styles.subheader}>Enter your phone number to start</Text>
 
-                        <View style={styles.inputContainer}>
-                            <User size={20} color={Colors.extrared} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Full Name"
-                                placeholderTextColor={Colors.extrared}
-                                value={name}
-                                onChangeText={setName}
-                                autoCapitalize="words"
-                            />
-                        </View>
+                                {/* RECAPTCHA CONTAINER */}
+                                {Platform.OS === 'web' && (
+                                    <View 
+                                        nativeID="recaptcha-container" 
+                                        style={{ minHeight: 80, marginVertical: 10, alignItems: 'center', justifyContent: 'center' }} 
+                                    />
+                                )}
 
+                                <View style={styles.inputContainer}>
+                                    <Text style={styles.countryCode}>+91</Text>
+                                    <View style={styles.verticalDivider} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Phone Number"
+                                        placeholderTextColor={Colors.extrared}
+                                        value={phone}
+                                        onChangeText={setPhone}
+                                        keyboardType="phone-pad"
+                                        maxLength={10}
+                                        autoFocus
+                                    />
+                                </View>
 
-                        <View style={styles.inputContainer}>
-                            <Phone size={20} color={Colors.extrared} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Phone Number"
-                                placeholderTextColor={Colors.extrared}
-                                value={phone}
-                                onChangeText={setPhone}
-                                keyboardType="phone-pad"
-                            />
-                        </View>
+                                <TouchableOpacity
+                                    style={styles.loginButton}
+                                    onPress={handleSendOTP}
+                                    disabled={isLoading}
+                                >
+                                    {isLoading ? (
+                                        <ActivityIndicator color={Colors.white} />
+                                    ) : (
+                                        <>
+                                            <Text style={styles.loginButtonText}>Send OTP</Text>
+                                            <ArrowRight size={20} color={Colors.white} />
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            </>
+                        )}
 
-                        {/* Split Address Inputs */}
-                        <Text style={styles.sectionHeader}>Address Details</Text>
+                        {step === 'otp' && (
+                            <>
+                                <TouchableOpacity style={styles.backButton} onPress={() => setStep('phone')}>
+                                    <ChevronLeft size={20} color={Colors.charcoal} />
+                                    <Text style={styles.backText}>Back</Text>
+                                </TouchableOpacity>
 
-                        <View style={styles.inputContainer}>
-                            <MapPin size={20} color={Colors.extrared} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="House No. & Name"
-                                placeholderTextColor={Colors.extrared}
-                                value={houseDetails}
-                                onChangeText={setHouseDetails}
-                            />
-                        </View>
+                                <Text style={styles.header}>Verify Phone</Text>
+                                <Text style={styles.subheader}>Enter the 6-digit code sent to +91 {phone}</Text>
 
-                        <View style={styles.inputContainer}>
-                            <MapPin size={20} color={Colors.extrared} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Landmark"
-                                placeholderTextColor={Colors.extrared}
-                                value={landmark}
-                                onChangeText={setLandmark}
-                            />
-                        </View>
-
-                        <View style={styles.rowContainer}>
-                            <View style={[styles.inputContainer, { flex: 1 }]}>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Place/Area"
-                                    placeholderTextColor={Colors.extrared}
-                                    value={place}
-                                    onChangeText={setPlace}
+                                <OTPInput 
+                                    length={6} 
+                                    onComplete={handleVerifyOTP} 
+                                    isLoading={isLoading} 
                                 />
-                            </View>
-                            <View style={[styles.inputContainer, { flex: 1 }]}>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="City"
-                                    placeholderTextColor={Colors.extrared}
-                                    value={city}
-                                    onChangeText={setCity}
-                                />
-                            </View>
-                        </View>
 
-                        <View style={styles.rowContainer}>
-                            <View style={[styles.inputContainer, { flex: 1 }]}>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="State"
-                                    placeholderTextColor={Colors.extrared}
-                                    value={state}
-                                    onChangeText={setState}
-                                />
-                            </View>
-                            <View style={[styles.inputContainer, { flex: 1 }]}>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Pincode"
-                                    placeholderTextColor={Colors.extrared}
-                                    value={pincode}
-                                    onChangeText={setPincode}
-                                    keyboardType="numeric"
-                                    maxLength={6}
-                                />
-                            </View>
-                        </View>
+                                {isLoading && <ActivityIndicator color={Colors.orange} style={{ marginTop: 10 }} />}
+                            </>
+                        )}
 
-                        <View style={styles.inputContainer}>
-                            <Mail size={20} color={Colors.extrared} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Email Address"
-                                placeholderTextColor={Colors.extrared}
-                                value={email}
-                                onChangeText={setEmail}
-                                autoCapitalize="none"
-                                keyboardType="email-address"
-                            />
-                        </View>
+                        {step === 'details' && (
+                            <>
+                                <Text style={styles.header}>Complete Profile</Text>
+                                <Text style={styles.subheader}>Just a few more details to get started</Text>
 
-                        <View style={styles.inputContainer}>
-                            <Lock size={20} color={Colors.extrared} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Password"
-                                placeholderTextColor={Colors.extrared}
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                            />
-                        </View>
+                                <View style={styles.inputContainer}>
+                                    <User size={20} color={Colors.extrared} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Full Name"
+                                        placeholderTextColor={Colors.extrared}
+                                        value={name}
+                                        onChangeText={setName}
+                                        autoCapitalize="words"
+                                    />
+                                </View>
 
-                        <View style={styles.inputContainer}>
-                            <Lock size={20} color={Colors.extrared} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Confirm Password"
-                                placeholderTextColor={Colors.extrared}
-                                value={confirmPassword}
-                                onChangeText={setConfirmPassword}
-                                secureTextEntry
-                            />
-                        </View>
+                                <View style={styles.inputContainer}>
+                                    <Mail size={20} color={Colors.extrared} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Email Address (Optional)"
+                                        placeholderTextColor={Colors.extrared}
+                                        value={email}
+                                        onChangeText={setEmail}
+                                        autoCapitalize="none"
+                                        keyboardType="email-address"
+                                    />
+                                </View>
 
+                                <Text style={styles.sectionHeader}>Address Details</Text>
 
-                        <TouchableOpacity
-                            style={styles.loginButton}
-                            onPress={handleSignup}
-                            disabled={isLoading}
-                        >
-                            {isLoading ? (
-                                <ActivityIndicator color={Colors.white} />
-                            ) : (
-                                <>
-                                    <Text style={styles.loginButtonText}>Create Account</Text>
-                                    <ArrowRight size={20} color={Colors.white} />
-                                </>
-                            )}
-                        </TouchableOpacity>
+                                <View style={styles.inputContainer}>
+                                    <MapPin size={20} color={Colors.extrared} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="House No. & Name"
+                                        placeholderTextColor={Colors.extrared}
+                                        value={houseDetails}
+                                        onChangeText={setHouseDetails}
+                                    />
+                                </View>
 
+                                <View style={styles.inputContainer}>
+                                    <MapPin size={20} color={Colors.extrared} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Landmark"
+                                        placeholderTextColor={Colors.extrared}
+                                        value={landmark}
+                                        onChangeText={setLandmark}
+                                    />
+                                </View>
 
+                                <View style={styles.rowContainer}>
+                                    <View style={[styles.inputContainer, { flex: 1 }]}>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="Place/Area"
+                                            placeholderTextColor={Colors.extrared}
+                                            value={place}
+                                            onChangeText={setPlace}
+                                        />
+                                    </View>
+                                    <View style={[styles.inputContainer, { flex: 1 }]}>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="City"
+                                            placeholderTextColor={Colors.extrared}
+                                            value={city}
+                                            onChangeText={setCity}
+                                        />
+                                    </View>
+                                </View>
+
+                                <View style={styles.rowContainer}>
+                                    <View style={[styles.inputContainer, { flex: 1 }]}>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="State"
+                                            placeholderTextColor={Colors.extrared}
+                                            value={state}
+                                            onChangeText={setState}
+                                        />
+                                    </View>
+                                    <View style={[styles.inputContainer, { flex: 1 }]}>
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="Pincode"
+                                            placeholderTextColor={Colors.extrared}
+                                            value={pincode}
+                                            onChangeText={setPincode}
+                                            keyboardType="numeric"
+                                            maxLength={6}
+                                        />
+                                    </View>
+                                </View>
+
+                                <TouchableOpacity
+                                    style={styles.loginButton}
+                                    onPress={handleCompleteSignup}
+                                    disabled={isLoading}
+                                >
+                                    {isLoading ? (
+                                        <ActivityIndicator color={Colors.white} />
+                                    ) : (
+                                        <>
+                                            <Text style={styles.loginButtonText}>Create Account</Text>
+                                            <ArrowRight size={20} color={Colors.white} />
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            </>
+                        )}
 
                         <View style={styles.footer}>
                             <Text style={styles.footerText}>Already have an account?</Text>
@@ -311,6 +425,11 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: 'bold',
         color: Colors.charcoal,
+    },
+    subheader: {
+        fontSize: 14,
+        color: Colors.charcoal,
+        opacity: 0.6,
         marginBottom: 8,
     },
     inputContainer: {
@@ -321,6 +440,17 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         borderRadius: 16,
         gap: 12,
+    },
+    countryCode: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: Colors.charcoal,
+    },
+    verticalDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: Colors.charcoal,
+        opacity: 0.1,
     },
     input: {
         flex: 1,
@@ -344,39 +474,16 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: Colors.white,
     },
-    divider: {
+    backButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: 16,
-        gap: 12,
+        gap: 4,
+        marginBottom: 8,
     },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: Colors.creamLight,
-    },
-    dividerText: {
+    backText: {
         fontSize: 14,
-        color: Colors.extrared,
-        fontWeight: 'bold',
-    },
-    socialButtons: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    socialButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        borderRadius: 12,
-        gap: 8,
-    },
-    socialButtonText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: Colors.white,
+        fontWeight: '600',
+        color: Colors.charcoal,
     },
     footer: {
         flexDirection: 'row',

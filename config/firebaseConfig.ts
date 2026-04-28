@@ -22,15 +22,21 @@ if (getApps().length === 0) {
     app = getApp();
 }
 
+import { Platform } from 'react-native';
+
 // Initialize Auth with persistence
-// @ts-ignore
 let auth: import('firebase/auth').Auth;
-if (typeof getReactNativePersistence === 'function') {
-    auth = initializeAuth(app, {
-        persistence: getReactNativePersistence(ReactNativeAsyncStorage)
-    });
-} else {
+if (Platform.OS === 'web') {
     auth = getAuth(app);
+} else {
+    // @ts-ignore
+    if (typeof getReactNativePersistence === 'function') {
+        auth = initializeAuth(app, {
+            persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+        });
+    } else {
+        auth = getAuth(app);
+    }
 }
 
 // Initialize Firestore
