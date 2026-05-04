@@ -54,7 +54,7 @@ export default function CheckoutScreen() {
   const taxAmount = cartTotal * taxRate;
 
   // Platform Fee Calculation
-  const platformFeeRate = 0.03; // 3%
+  const platformFeeRate = 0.00; // 0%
   const platformFeeAmount = cartTotal * platformFeeRate;
 
   // Delivery Charge Calculation

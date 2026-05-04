@@ -56,6 +56,14 @@ export default function SignupScreen() {
 
     useEffect(() => {
         if (Platform.OS === 'web') {
+            // Workaround for reCAPTCHA state issues on live websites: force a one-time reload
+            const hasReloaded = sessionStorage.getItem('signup_reloaded');
+            if (!hasReloaded) {
+                sessionStorage.setItem('signup_reloaded', 'true');
+                window.location.reload();
+                return;
+            }
+
             const initRecaptcha = () => {
                 try {
                     const container = document.getElementById('recaptcha-container');
@@ -78,7 +86,11 @@ export default function SignupScreen() {
             };
 
             const timer = setTimeout(initRecaptcha, 500);
-            return () => clearTimeout(timer);
+            return () => {
+                clearTimeout(timer);
+                // Clear the flag when the user navigates away, so it reloads again next time they visit
+                sessionStorage.removeItem('signup_reloaded');
+            };
         }
     }, []);
 
