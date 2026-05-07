@@ -43,14 +43,6 @@ export default function LoginScreen() {
 
     useEffect(() => {
         if (Platform.OS === 'web') {
-            // Workaround for reCAPTCHA state issues on live websites: force a reload every time the user visits
-            const hasReloaded = sessionStorage.getItem('login_reloaded');
-            if (!hasReloaded) {
-                sessionStorage.setItem('login_reloaded', 'true');
-                window.location.reload();
-                return;
-            }
-
             const initRecaptcha = () => {
                 try {
                     console.log("[Login] Initializing RecaptchaVerifier on 'recaptcha-container'...");
@@ -70,10 +62,7 @@ export default function LoginScreen() {
 
             // Delay to ensure the container is in the DOM
             const timer = setTimeout(initRecaptcha, 1000);
-            return () => {
-                clearTimeout(timer);
-                sessionStorage.removeItem('login_reloaded');
-            };
+            return () => clearTimeout(timer);
         }
     }, []);
 
@@ -223,7 +212,13 @@ export default function LoginScreen() {
 
                         <View style={styles.footer}>
                             <Text style={styles.footerText}>Don't have an account?</Text>
-                            <TouchableOpacity onPress={() => router.push('/signup')}>
+                            <TouchableOpacity onPress={() => {
+                                if (Platform.OS === 'web') {
+                                    window.location.href = '/signup';
+                                } else {
+                                    router.push('/signup');
+                                }
+                            }}>
                                 <Text style={styles.linkText}>Sign Up</Text>
                             </TouchableOpacity>
                         </View>
