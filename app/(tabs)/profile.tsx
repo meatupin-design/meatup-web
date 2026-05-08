@@ -191,9 +191,9 @@ export default function ProfileScreen() {
             <Text style={styles.userEmail}>{user.email}</Text>
 
             {isGuest ? (
-              <TouchableOpacity style={styles.signInPill} onPress={() => router.push('/login')}>
+              <TouchableOpacity style={styles.signInPill} onPress={() => router.push('/signup')}>
                 <LogIn size={16} color={Colors.deepTeal} />
-                <Text style={styles.signInText}>Sign In / Sign Up</Text>
+                <Text style={styles.signInText}>Sign Up</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity style={styles.editProfilePill} onPress={() => setIsEditing(true)}>
@@ -278,8 +278,8 @@ export default function ProfileScreen() {
               <View style={styles.sectionContainer}>
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>My Addresses</Text>
-                  <TouchableOpacity 
-                    style={styles.addButton} 
+                  <TouchableOpacity
+                    style={styles.addButton}
                     onPress={() => setShowAddressForm(!showAddressForm)}
                   >
                     <Plus size={18} color={Colors.deepTeal} />
@@ -307,7 +307,7 @@ export default function ProfileScreen() {
                         placeholder="House No, Street, Landmark..."
                       />
                     </View>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.confirmAddBtn}
                       onPress={async () => {
                         if (newAddrDetails.trim()) {
@@ -341,7 +341,7 @@ export default function ProfileScreen() {
                               <Text style={styles.addressDetails}>{addr.details}</Text>
                             </View>
                             {addr.id !== 'primary' && (
-                              <TouchableOpacity 
+                              <TouchableOpacity
                                 onPress={() => removeAddress(addr.id)}
                                 style={styles.deleteAddrBtn}
                               >
