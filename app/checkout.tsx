@@ -20,11 +20,11 @@ import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
-import { calculateDistance, calculateDeliveryTime, STORE_LOCATION } from '@/utils/locationUtils';
+import { calculateDistance, calculateDeliveryTime, STORE_LOCATION, getGoogleMapsDistance } from '@/utils/locationUtils';
 import OrderSuccessModal from '@/components/OrderSuccessModal';
 import RazorpayCheckoutGateway from '@/components/RazorpayCheckoutGateway';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '@/config/firebaseConfig';
+import { app, firebaseConfig } from '@/config/firebaseConfig';
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -123,12 +123,33 @@ export default function CheckoutScreen() {
       let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const { latitude, longitude } = location.coords;
 
-      const dist = calculateDistance(
+      // Use Google Maps for real road distance if possible
+      const googleData = await getGoogleMapsDistance(
         latitude,
         longitude,
         STORE_LOCATION.latitude,
-        STORE_LOCATION.longitude
+        STORE_LOCATION.longitude,
+        firebaseConfig.apiKey
       );
+
+      let dist: number;
+      let time: number;
+
+      if (googleData) {
+        dist = googleData.distanceKm;
+        time = calculateDeliveryTime(dist, true); // Already road distance
+      } else {
+        // Fallback to Haversine straight-line estimation
+        const straightDist = calculateDistance(
+          latitude,
+          longitude,
+          STORE_LOCATION.latitude,
+          STORE_LOCATION.longitude
+        );
+        // Estimate road distance (1.4x) for display as well
+        dist = straightDist * 1.4;
+        time = calculateDeliveryTime(straightDist, false);
+      }
 
       if (dist > 20) {
         setDeliveryDistance(null);
@@ -136,7 +157,7 @@ export default function CheckoutScreen() {
         setLocationError('Delivery is currently unavailable in your area (Max 20km).');
       } else {
         setDeliveryDistance(parseFloat(dist.toFixed(1)));
-        setDeliveryTime(calculateDeliveryTime(dist));
+        setDeliveryTime(time);
       }
 
       if (!address) {
@@ -215,12 +236,34 @@ export default function CheckoutScreen() {
       }
 
       const { lat, lon } = coords;
-      const dist = calculateDistance(
+      
+      // Use Google Maps for real road distance if possible
+      const googleData = await getGoogleMapsDistance(
         lat,
         lon,
         STORE_LOCATION.latitude,
-        STORE_LOCATION.longitude
+        STORE_LOCATION.longitude,
+        firebaseConfig.apiKey
       );
+
+      let dist: number;
+      let time: number;
+
+      if (googleData) {
+        dist = googleData.distanceKm;
+        time = calculateDeliveryTime(dist, true); // Already road distance
+      } else {
+        // Fallback to Haversine straight-line estimation
+        const straightDist = calculateDistance(
+          lat,
+          lon,
+          STORE_LOCATION.latitude,
+          STORE_LOCATION.longitude
+        );
+        // Estimate road distance (1.4x) for display as well
+        dist = straightDist * 1.4;
+        time = calculateDeliveryTime(straightDist, false);
+      }
 
       if (dist > 20) {
         setDeliveryDistance(null);
@@ -228,7 +271,7 @@ export default function CheckoutScreen() {
         setLocationError('Delivery is currently unavailable in your area (Max 20km).');
       } else {
         setDeliveryDistance(parseFloat(dist.toFixed(1)));
-        setDeliveryTime(calculateDeliveryTime(dist));
+        setDeliveryTime(time);
       }
 
     } catch (error) {

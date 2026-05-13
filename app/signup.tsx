@@ -21,6 +21,7 @@ import StatusBanner from '@/components/StatusBanner';
 import { RecaptchaVerifier, ConfirmationResult } from 'firebase/auth';
 import { auth } from '@/config/firebaseConfig';
 import OTPInput from '@/components/OTPInput';
+import { UserService } from '@/services/UserService';
 
 export default function SignupScreen() {
     const { width: windowWidth } = useWindowDimensions();
@@ -116,12 +117,23 @@ export default function SignupScreen() {
         try {
             const result = await confirmationResult.confirm(otpCode);
             if (result.user) {
-                // Phone verified.
-                setStep('details');
-                showBanner('success', 'Phone verified! Please complete your profile.');
+                // Check if user already exists
+                const existingProfile = await UserService.getUser(result.user.uid);
+                
+                if (existingProfile) {
+                    showBanner('success', 'Account found! Logging you in...');
+                    setTimeout(() => {
+                        router.replace('/(tabs)');
+                    }, 1000);
+                } else {
+                    // Phone verified, new user.
+                    setStep('details');
+                    showBanner('success', 'Phone verified! Please complete your profile.');
+                }
             }
         } catch (e: any) {
-            showBanner('error', 'Invalid verification code.');
+            console.error("OTP Verification Error:", e);
+            showBanner('error', 'Invalid verification code or server error.');
         } finally {
             setIsLoading(false);
         }
