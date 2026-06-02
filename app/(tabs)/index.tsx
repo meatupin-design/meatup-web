@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Search, TrendingUp, TrendingDown, ShoppingCart, ArrowRight, ShoppingBag, Plus, Minus, SlidersHorizontal, Clock, SlidersHorizontal, X, Check } from 'lucide-react-native';
+import { Search, TrendingUp, TrendingDown, ShoppingCart, ArrowRight, ShoppingBag, Plus, Minus, Clock, SlidersHorizontal, X, Check } from 'lucide-react-native';
 import { Modal } from 'react-native';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
@@ -40,29 +40,19 @@ export default function HomeScreen() {
   const { products, addToCart, cartItemCount, cart, removeFromCart, cartTotal } = useApp();
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [sortBy, setSortBy] = useState<'default' | 'priceAsc' | 'priceDesc'>('default');
-  const [inStockOnly, setInStockOnly] = useState(false);
-  const [showFilters, setShowFilters] = useState(true);
   const [filterVisible, setFilterVisible] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [inStockOnly, setInStockOnly] = useState(false);
-  const [sortMode, setSortMode] = useState<'default' | 'price_asc' | 'price_desc'>('default');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedSort, setSelectedSort] = useState<'default' | 'price_asc' | 'price_desc' | 'available'>('default');
+  const hasActiveFilter = selectedSort !== 'default' || selectedCategory !== 'All';
 
-  // Derive unique categories from product list
-  const categories = React.useMemo(() => {
-    const cats = new Set<string>();
-    products.forEach(p => { if (p.category) cats.add(p.category); });
-    return Array.from(cats).sort();
+  // Derive unique categories from products, preserving natural order
+  const categories = useMemo(() => {
+    return ['All', ...Array.from(new Set(
+      products
+        .filter(p => p.category)
+        .map(p => p.category.trim())
+    ))];
   }, [products]);
-
-  const activeFilterCount = (selectedCategory ? 1 : 0) + (inStockOnly ? 1 : 0) + (sortMode !== 'default' ? 1 : 0);
-
-  const clearFilters = () => {
-    setSelectedCategory(null);
-    setInStockOnly(false);
-    setSortMode('default');
-  };
   const tickerPosition = useRef(new Animated.Value(0)).current;
 
   const [storeSettings, setStoreSettings] = useState<{ opening_time?: string } | null>(null);
@@ -121,12 +111,18 @@ export default function HomeScreen() {
   const filteredProducts = (searchQuery
     ? products.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : products
-  ).sort((a, b) => {
+  ).filter((p) => {
+    if (selectedCategory !== 'All') return p.category?.trim() === selectedCategory;
+    return true;
+  }).filter((p) => {
+    if (selectedSort === 'available') return isProductAvailableToday(p);
+    return true;
+  }).sort((a, b) => {
+    if (selectedSort === 'price_asc') return a.current_price - b.current_price;
+    if (selectedSort === 'price_desc') return b.current_price - a.current_price;
     const aAvail = isProductAvailableToday(a);
     const bAvail = isProductAvailableToday(b);
-    // Out-of-stock always last
     if (aAvail !== bAvail) return aAvail ? -1 : 1;
-    // Both same availability → sort by display_order (undefined = Infinity)
     const orderA = a.display_order ?? Infinity;
     const orderB = b.display_order ?? Infinity;
     return orderA - orderB;
@@ -193,16 +189,77 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.searchBarContainer}>
-            <Search size={18} color={Colors.deepTeal.substring(0, 7) + '90'} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search for fresh cuts..."
-              placeholderTextColor={Colors.deepTeal.substring(0, 7) + '70'}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
+          <View style={styles.searchRow}>
+            <View style={styles.searchBarContainer}>
+              <Search size={18} color={Colors.deepTeal.substring(0, 7) + '90'} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search for fresh cuts..."
+                placeholderTextColor={Colors.deepTeal.substring(0, 7) + '70'}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <X size={16} color={Colors.deepTeal} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.filterBtn, filterVisible && styles.filterBtnActive]}
+              onPress={() => setFilterVisible(!filterVisible)}
+              activeOpacity={0.8}
+            >
+              <SlidersHorizontal size={18} color={filterVisible ? Colors.white : Colors.deepTeal} />
+              {hasActiveFilter && <View style={styles.filterActiveDot} />}
+            </TouchableOpacity>
           </View>
+
+          {/* Category Chips — always visible horizontal scroll */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryRow}
+            style={{ marginTop: 10 }}
+          >
+            {categories.map((cat) => (
+              <TouchableOpacity
+                key={cat}
+                style={[styles.categoryChip, selectedCategory === cat && styles.categoryChipActive]}
+                onPress={() => setSelectedCategory(cat)}
+              >
+                <Text style={[styles.categoryChipText, selectedCategory === cat && styles.categoryChipTextActive]}>
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Sort Panel — shown when filter button is tapped */}
+          {filterVisible && (
+            <View style={styles.filterPanel}>
+              <Text style={styles.sortLabel}>Sort by:</Text>
+              {([
+                { key: 'default', label: 'Default' },
+                { key: 'available', label: '✓ In Stock' },
+                { key: 'price_asc', label: 'Price ↑' },
+                { key: 'price_desc', label: 'Price ↓' },
+              ] as const).map(({ key, label }) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.filterChip, selectedSort === key && styles.filterChipActive]}
+                  onPress={() => {
+                    setSelectedSort(key);
+                    setFilterVisible(false);
+                  }}
+                >
+                  <Text style={[styles.filterChipText, selectedSort === key && styles.filterChipTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
       </View>
 
@@ -532,6 +589,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 24,
+    gap: 10,
+  },
   searchBarContainer: {
     flex: 1,
     flexDirection: 'row',
@@ -554,6 +617,95 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
   } as any,
+  filterBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Colors.deepTeal,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  filterBtnActive: {
+    backgroundColor: Colors.deepTeal,
+  },
+  filterActiveDot: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: Colors.orange,
+    borderWidth: 1,
+    borderColor: Colors.white,
+  },
+  filterPanel: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: 24,
+    marginTop: 10,
+    gap: 8,
+    paddingBottom: 8,
+  },
+  filterChip: {
+    paddingVertical: 7,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  filterChipActive: {
+    backgroundColor: Colors.orange,
+    borderColor: Colors.orange,
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.deepTeal,
+  },
+  filterChipTextActive: {
+    color: Colors.white,
+  },
+  categoryRow: {
+    paddingHorizontal: 24,
+    gap: 8,
+    paddingBottom: 12,
+  },
+  categoryChip: {
+    paddingVertical: 7,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  categoryChipActive: {
+    backgroundColor: Colors.white,
+    borderColor: Colors.white,
+  },
+  categoryChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.85)',
+  },
+  categoryChipTextActive: {
+    color: Colors.deepTeal,
+  },
+  sortLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.7)',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    alignSelf: 'center',
+    marginRight: 4,
+  },
 
   // Scroll
   scrollView: {
