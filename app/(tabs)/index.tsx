@@ -15,12 +15,16 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Search, TrendingUp, TrendingDown, ShoppingCart, ArrowRight, ShoppingBag, Plus, Minus } from 'lucide-react-native';
+import { Search, TrendingUp, TrendingDown, ShoppingCart, ArrowRight, ShoppingBag, Plus, Minus, Clock, SlidersHorizontal, X, Check } from 'lucide-react-native';
+import { Modal } from 'react-native';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import { Product } from '@/types';
 import CuttingModal from '@/components/CuttingModal';
 import { getNextAvailableDay, isProductAvailableToday } from '@/utils/getNextAvailableDay';
+import { db } from '@/config/firebaseConfig';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
@@ -36,7 +40,41 @@ export default function HomeScreen() {
   const { products, addToCart, cartItemCount, cart, removeFromCart, cartTotal } = useApp();
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [inStockOnly, setInStockOnly] = useState(false);
+  const [sortMode, setSortMode] = useState<'default' | 'price_asc' | 'price_desc'>('default');
+
+  // Derive unique categories from product list
+  const categories = React.useMemo(() => {
+    const cats = new Set<string>();
+    products.forEach(p => { if (p.category) cats.add(p.category); });
+    return Array.from(cats).sort();
+  }, [products]);
+
+  const activeFilterCount = (selectedCategory ? 1 : 0) + (inStockOnly ? 1 : 0) + (sortMode !== 'default' ? 1 : 0);
+
+  const clearFilters = () => {
+    setSelectedCategory(null);
+    setInStockOnly(false);
+    setSortMode('default');
+  };
   const tickerPosition = useRef(new Animated.Value(0)).current;
+
+  const [storeSettings, setStoreSettings] = useState<{ opening_time?: string } | null>(null);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "store"), (docSnap) => {
+      if (docSnap.exists()) {
+        setStoreSettings(docSnap.data() as { opening_time?: string });
+      }
+    }, (err) => {
+      console.log("Error loading store settings", err);
+    });
+    return () => unsub();
+  }, []);
+
+  const allProductsOutOfStock = products.length > 0 && products.every(p => !isProductAvailableToday(p));
 
   // Ticker Animation
   useEffect(() => {
@@ -76,19 +114,46 @@ export default function HomeScreen() {
     }
   }, [products]);
 
-  const filteredProducts = (searchQuery
-    ? products.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : products
-  ).sort((a, b) => {
-    const aAvail = isProductAvailableToday(a);
-    const bAvail = isProductAvailableToday(b);
-    // Out-of-stock always last
-    if (aAvail !== bAvail) return aAvail ? -1 : 1;
-    // Both same availability → sort by display_order (undefined = Infinity)
-    const orderA = a.display_order ?? Infinity;
-    const orderB = b.display_order ?? Infinity;
-    return orderA - orderB;
-  });
+  const filteredProducts = React.useMemo(() => {
+    let list = products;
+
+    // 1. Search filter
+    if (searchQuery) {
+      list = list.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+
+    // 2. Category filter
+    if (selectedCategory) {
+      list = list.filter(p => p.category === selectedCategory);
+    }
+
+    // 3. In-stock only filter
+    if (inStockOnly) {
+      list = list.filter(p => isProductAvailableToday(p));
+    }
+
+    // 4. Sort
+    return [...list].sort((a, b) => {
+      const aAvail = isProductAvailableToday(a);
+      const bAvail = isProductAvailableToday(b);
+
+      if (sortMode === 'price_asc') {
+        // Available first, then by price ascending
+        if (aAvail !== bAvail) return aAvail ? -1 : 1;
+        return a.current_price - b.current_price;
+      }
+      if (sortMode === 'price_desc') {
+        if (aAvail !== bAvail) return aAvail ? -1 : 1;
+        return b.current_price - a.current_price;
+      }
+
+      // Default: out-of-stock last, then display_order
+      if (aAvail !== bAvail) return aAvail ? -1 : 1;
+      const orderA = a.display_order ?? Infinity;
+      const orderB = b.display_order ?? Infinity;
+      return orderA - orderB;
+    });
+  }, [products, searchQuery, selectedCategory, inStockOnly, sortMode]);
 
   const topProducts = products.slice(0, 5); // Show top 5 in ticker
 
@@ -151,16 +216,132 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.searchBarContainer}>
-            <Search size={18} color={Colors.deepTeal.substring(0, 7) + '90'} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search for fresh cuts..."
-              placeholderTextColor={Colors.deepTeal.substring(0, 7) + '70'}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
+          <View style={styles.searchRow}>
+            <View style={styles.searchBarContainer}>
+              <Search size={18} color={Colors.deepTeal.substring(0, 7) + '90'} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search for fresh cuts..."
+                placeholderTextColor={Colors.deepTeal.substring(0, 7) + '70'}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <X size={16} color={Colors.deepTeal.substring(0, 7) + '70'} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Filter Button */}
+            <TouchableOpacity
+              style={[styles.filterBtn, activeFilterCount > 0 && styles.filterBtnActive]}
+              onPress={() => setFilterVisible(true)}
+            >
+              <SlidersHorizontal size={18} color={activeFilterCount > 0 ? Colors.white : Colors.deepTeal} />
+              {activeFilterCount > 0 && (
+                <View style={styles.filterBadge}>
+                  <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
+
+          {/* Filter Modal */}
+          <Modal
+            visible={filterVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setFilterVisible(false)}
+          >
+            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setFilterVisible(false)}>
+              <TouchableOpacity activeOpacity={1} style={styles.filterSheet}>
+                {/* Sheet Header */}
+                <View style={styles.filterSheetHeader}>
+                  <Text style={styles.filterSheetTitle}>Filter & Sort</Text>
+                  <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                    {activeFilterCount > 0 && (
+                      <TouchableOpacity onPress={clearFilters}>
+                        <Text style={styles.clearText}>Clear all</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={styles.sheetCloseBtn}
+                      onPress={() => setFilterVisible(false)}
+                    >
+                      <X size={18} color={Colors.charcoal} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Category Section */}
+                {categories.length > 0 && (
+                  <View style={styles.filterSection}>
+                    <Text style={styles.filterSectionTitle}>Category</Text>
+                    <View style={styles.chipRow}>
+                      {categories.map(cat => (
+                        <TouchableOpacity
+                          key={cat}
+                          style={[styles.chip, selectedCategory === cat && styles.chipActive]}
+                          onPress={() => setSelectedCategory(prev => prev === cat ? null : cat)}
+                        >
+                          {selectedCategory === cat && <Check size={12} color={Colors.white} />}
+                          <Text style={[styles.chipText, selectedCategory === cat && styles.chipTextActive]}>
+                            {cat}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Availability Section */}
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterSectionTitle}>Availability</Text>
+                  <TouchableOpacity
+                    style={[styles.chip, inStockOnly && styles.chipActive]}
+                    onPress={() => setInStockOnly(prev => !prev)}
+                  >
+                    {inStockOnly && <Check size={12} color={Colors.white} />}
+                    <Text style={[styles.chipText, inStockOnly && styles.chipTextActive]}>In Stock Only</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Sort Section */}
+                <View style={styles.filterSection}>
+                  <Text style={styles.filterSectionTitle}>Sort By</Text>
+                  <View style={styles.chipRow}>
+                    {[
+                      { label: 'Default', value: 'default' as const },
+                      { label: 'Price: Low → High', value: 'price_asc' as const },
+                      { label: 'Price: High → Low', value: 'price_desc' as const },
+                    ].map(opt => (
+                      <TouchableOpacity
+                        key={opt.value}
+                        style={[styles.chip, sortMode === opt.value && styles.chipActive]}
+                        onPress={() => setSortMode(opt.value)}
+                      >
+                        {sortMode === opt.value && <Check size={12} color={Colors.white} />}
+                        <Text style={[styles.chipText, sortMode === opt.value && styles.chipTextActive]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Apply Button */}
+                <TouchableOpacity
+                  style={styles.applyBtn}
+                  onPress={() => setFilterVisible(false)}
+                >
+                  <Text style={styles.applyBtnText}>
+                    Show {filteredProducts.length} result{filteredProducts.length !== 1 ? 's' : ''}
+                  </Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </Modal>
         </View>
       </View>
 
@@ -169,6 +350,29 @@ export default function HomeScreen() {
         contentContainerStyle={[styles.scrollContent, { maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
       >
+        {allProductsOutOfStock && (
+          <View style={styles.bannerContainer}>
+            <LinearGradient
+              colors={['#63020c', '#8f0503']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0.8 }}
+              style={styles.bannerCard}
+            >
+              <View style={styles.bannerIconBg}>
+                <Clock size={24} color={Colors.white} />
+              </View>
+              <View style={styles.bannerTextContainer}>
+                <View style={styles.bannerHeaderRow}>
+                  <Text style={styles.bannerTitle}>Store Opening Soon</Text>
+                  <View style={styles.pulseDot} />
+                </View>
+                <Text style={styles.bannerSubtitle}>
+                  Next scheduled opening: {storeSettings?.opening_time || 'Check back soon'}
+                </Text>
+              </View>
+            </LinearGradient>
+          </View>
+        )}
 
         {/* 2. Live Ticker */}
         {topProducts.length > 0 && (
@@ -467,11 +671,17 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 24,
+    gap: 10,
+  },
   searchBarContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.white,
-    marginHorizontal: 24,
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 16,
@@ -489,6 +699,141 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
   } as any,
+  filterBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Colors.deepTeal,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+    position: 'relative',
+  },
+  filterBtnActive: {
+    backgroundColor: Colors.deepTeal,
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: Colors.orange,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: Colors.deepTeal,
+  },
+  filterBadgeText: {
+    color: Colors.white,
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  // Filter Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  filterSheet: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 36,
+    gap: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  filterSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  filterSheetTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.charcoal,
+    letterSpacing: -0.3,
+  },
+  clearText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.orange,
+  },
+  sheetCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterSection: {
+    gap: 12,
+  },
+  filterSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#999',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1.5,
+    borderColor: '#EBEBEB',
+  },
+  chipActive: {
+    backgroundColor: Colors.deepTeal,
+    borderColor: Colors.deepTeal,
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.charcoal,
+  },
+  chipTextActive: {
+    color: Colors.white,
+  },
+  applyBtn: {
+    backgroundColor: Colors.orange,
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 4,
+    shadowColor: Colors.orange,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  applyBtnText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.white,
+    letterSpacing: 0.3,
+  },
 
   // Scroll
   scrollView: {
@@ -818,5 +1163,62 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontWeight: '700',
     fontSize: 13,
+  },
+  bannerContainer: {
+    paddingHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  bannerCard: {
+    borderRadius: 24,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    shadowColor: '#8f0503',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  bannerIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  bannerTextContainer: {
+    flex: 1,
+  },
+  bannerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  bannerTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#fffeefff',
+    letterSpacing: 0.3,
+  },
+  bannerSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFF1D6',
+    opacity: 0.9,
+  },
+  pulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#fffeefff',
+    opacity: 0.8,
   },
 });
