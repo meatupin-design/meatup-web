@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Search, TrendingUp, TrendingDown, ShoppingCart, ArrowRight, ShoppingBag, Plus, Minus } from 'lucide-react-native';
+import { Search, TrendingUp, TrendingDown, ShoppingCart, ArrowRight, ShoppingBag, Plus, Minus, SlidersHorizontal } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import { Product } from '@/types';
@@ -36,6 +36,10 @@ export default function HomeScreen() {
   const { products, addToCart, cartItemCount, cart, removeFromCart, cartTotal } = useApp();
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [sortBy, setSortBy] = useState<'default' | 'priceAsc' | 'priceDesc'>('default');
+  const [inStockOnly, setInStockOnly] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const tickerPosition = useRef(new Animated.Value(0)).current;
 
   // Ticker Animation
@@ -76,19 +80,53 @@ export default function HomeScreen() {
     }
   }, [products]);
 
-  const filteredProducts = (searchQuery
-    ? products.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : products
-  ).sort((a, b) => {
-    const aAvail = isProductAvailableToday(a);
-    const bAvail = isProductAvailableToday(b);
-    // Out-of-stock always last
-    if (aAvail !== bAvail) return aAvail ? -1 : 1;
-    // Both same availability → sort by display_order (undefined = Infinity)
-    const orderA = a.display_order ?? Infinity;
-    const orderB = b.display_order ?? Infinity;
-    return orderA - orderB;
-  });
+  // Dynamic categories extracted from products
+  const categories = useMemo(() => {
+    const unique = Array.from(new Set(products.map((p) => p.category).filter(Boolean)));
+    return ['All', ...unique];
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    let result = [...products];
+
+    // Search query filter
+    if (searchQuery) {
+      result = result.filter((p) =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Category filter
+    if (selectedCategory && selectedCategory !== 'All') {
+      result = result.filter((p) => p.category === selectedCategory);
+    }
+
+    // In Stock filter
+    if (inStockOnly) {
+      result = result.filter((p) => isProductAvailableToday(p));
+    }
+
+    // Sort logic
+    if (sortBy === 'priceAsc') {
+      result.sort((a, b) => a.current_price - b.current_price);
+    } else if (sortBy === 'priceDesc') {
+      result.sort((a, b) => b.current_price - a.current_price);
+    } else {
+      // Default Sort logic
+      result.sort((a, b) => {
+        const aAvail = isProductAvailableToday(a);
+        const bAvail = isProductAvailableToday(b);
+        // Out-of-stock always last
+        if (aAvail !== bAvail) return aAvail ? -1 : 1;
+        // Both same availability → sort by display_order (undefined = Infinity)
+        const orderA = a.display_order ?? Infinity;
+        const orderB = b.display_order ?? Infinity;
+        return orderA - orderB;
+      });
+    }
+
+    return result;
+  }, [products, searchQuery, selectedCategory, inStockOnly, sortBy]);
 
   const topProducts = products.slice(0, 5); // Show top 5 in ticker
 
@@ -151,16 +189,141 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.searchBarContainer}>
-            <Search size={18} color={Colors.deepTeal.substring(0, 7) + '90'} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search for fresh cuts..."
-              placeholderTextColor={Colors.deepTeal.substring(0, 7) + '70'}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
+          {/* Search Row */}
+          <View style={styles.searchRow}>
+            <View style={styles.searchBarContainer}>
+              <Search size={18} color={Colors.deepTeal.substring(0, 7) + '90'} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search for fresh cuts..."
+                placeholderTextColor={Colors.deepTeal.substring(0, 7) + '70'}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+            <TouchableOpacity 
+              style={styles.filterBtn}
+              onPress={() => setShowFilters(!showFilters)}
+              activeOpacity={0.7}
+            >
+              <SlidersHorizontal size={20} color={Colors.cream} />
+            </TouchableOpacity>
           </View>
+
+          {/* Category Chips Scroll */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesScroll}
+          >
+            {categories.map((cat) => {
+              const isActive = selectedCategory === cat;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.categoryChip,
+                    isActive && styles.categoryChipActive,
+                  ]}
+                  onPress={() => setSelectedCategory(cat)}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      isActive && styles.categoryChipTextActive,
+                    ]}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* Sort & Availability Options */}
+          {showFilters && (
+            <View style={styles.sortContainer}>
+              <Text style={styles.sortByLabel}>SORT BY:</Text>
+              <View style={styles.sortChipsWrapper}>
+                {/* Default Sort */}
+                <TouchableOpacity
+                  style={[
+                    styles.sortChip,
+                    sortBy === 'default' && styles.sortChipActive,
+                  ]}
+                  onPress={() => setSortBy('default')}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.sortChipText,
+                      sortBy === 'default' && styles.sortChipTextActive,
+                    ]}
+                  >
+                    Default
+                  </Text>
+                </TouchableOpacity>
+
+                {/* In Stock Filter */}
+                <TouchableOpacity
+                  style={[
+                    styles.sortChip,
+                    inStockOnly && styles.sortChipActive,
+                  ]}
+                  onPress={() => setInStockOnly(!inStockOnly)}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.sortChipText,
+                      inStockOnly && styles.sortChipTextActive,
+                    ]}
+                  >
+                    {inStockOnly ? '✓ In Stock' : 'In Stock'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Price Low to High */}
+                <TouchableOpacity
+                  style={[
+                    styles.sortChip,
+                    sortBy === 'priceAsc' && styles.sortChipActive,
+                  ]}
+                  onPress={() => setSortBy('priceAsc')}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.sortChipText,
+                      sortBy === 'priceAsc' && styles.sortChipTextActive,
+                    ]}
+                  >
+                    Price ↑
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Price High to Low */}
+                <TouchableOpacity
+                  style={[
+                    styles.sortChip,
+                    sortBy === 'priceDesc' && styles.sortChipActive,
+                  ]}
+                  onPress={() => setSortBy('priceDesc')}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.sortChipText,
+                      sortBy === 'priceDesc' && styles.sortChipTextActive,
+                    ]}
+                  >
+                    Price ↓
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
       </View>
 
@@ -467,11 +630,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 24,
+    gap: 12,
+    marginBottom: 16,
+  },
   searchBarContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.white,
-    marginHorizontal: 24,
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 16,
@@ -489,6 +660,80 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
   } as any,
+  filterBtn: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categoriesScroll: {
+    paddingHorizontal: 24,
+    gap: 10,
+    paddingBottom: 16,
+  },
+  categoryChip: {
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  categoryChipActive: {
+    backgroundColor: Colors.white,
+    borderColor: Colors.white,
+  },
+  categoryChipText: {
+    color: Colors.cream,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  categoryChipTextActive: {
+    color: Colors.deepTeal,
+    fontWeight: '700',
+  },
+  sortContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginHorizontal: 24,
+    marginTop: 4,
+    gap: 12,
+  },
+  sortByLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.cream,
+    letterSpacing: 0.5,
+    marginTop: 10, // Align vertically with chips
+  },
+  sortChipsWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sortChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sortChipActive: {
+    backgroundColor: Colors.white,
+    borderColor: Colors.white,
+  },
+  sortChipText: {
+    color: Colors.cream,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sortChipTextActive: {
+    color: Colors.deepTeal,
+    fontWeight: '700',
+  },
 
   // Scroll
   scrollView: {
