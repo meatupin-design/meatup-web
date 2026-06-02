@@ -16,6 +16,11 @@ import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import CuttingModal from '@/components/CuttingModal';
 import { getNextAvailableDay, isProductAvailableToday } from '@/utils/getNextAvailableDay';
+import { Star, MessageSquare } from 'lucide-react-native';
+import { ReviewService } from '@/services/ReviewService';
+import ReviewModal from '@/components/ReviewModal';
+import { Review } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -28,7 +33,20 @@ export default function ProductDetailScreen() {
   const isLargeScreen = windowWidth >= 768;
   const contentMaxWidth = 1100;
 
+  const { user } = useAuth();
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+
   const product = products.find((p) => p.id === id);
+
+  React.useEffect(() => {
+    if (id) {
+      const unsubscribe = ReviewService.subscribeToProductReviews(id as string, (updatedReviews) => {
+        setReviews(updatedReviews);
+      });
+      return () => unsubscribe();
+    }
+  }, [id]);
 
   if (!product) {
     return (
@@ -47,10 +65,10 @@ export default function ProductDetailScreen() {
         : Colors.priceNeutral;
 
   const Icon = product.price_direction === 'up' ? TrendingUp : TrendingDown;
-  const isPcUnit = product.unit?.toLowerCase() === 'pc' || product.unit?.toLowerCase() === 'pack';
+  const isPcUnit = product.unit?.toLowerCase() === 'pc' || product.unit?.toLowerCase() === 'pack' || product.name.toLowerCase().includes('egg');
   const isEgg = product.name.toLowerCase().includes('egg');
   const weightOptions = isEgg ? [6, 12, 30] : isPcUnit ? [15, 30] : [0.5, 1, 2, 3, 4];
-  const defaultWeight = weightOptions[0];
+  const defaultWeight = weightOptions.includes(1) ? 1 : weightOptions[0];
   const effectiveWeight = selectedWeight ?? defaultWeight;
   const availableToday = isProductAvailableToday(product);
 
@@ -129,7 +147,7 @@ export default function ProductDetailScreen() {
                   <View style={styles.priceWrapper}>
                     <Text style={styles.currency}>₹</Text>
                     <Text style={styles.currentPrice}>{product.current_price}</Text>
-                    <Text style={styles.unit}>/{isPcUnit ? 'pc' : product.unit}</Text>
+                    <Text style={styles.unit}>/{isPcUnit ? 'PC' : product.unit}</Text>
                   </View>
 
                   {product.price_direction !== 'neutral' && (
@@ -141,6 +159,14 @@ export default function ProductDetailScreen() {
                       </Text>
                     </View>
                   )}
+
+                  <View style={styles.ratingOverview}>
+                    <Star size={16} fill={Colors.orange} color={Colors.orange} />
+                    <Text style={styles.ratingValue}>{product.rating || 'New'}</Text>
+                    {product.num_reviews ? (
+                      <Text style={styles.ratingCount}>({product.num_reviews} reviews)</Text>
+                    ) : null}
+                  </View>
                 </View>
               </View>
 
@@ -152,7 +178,7 @@ export default function ProductDetailScreen() {
               </View>
 
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Select {isPcUnit ? 'Quantity' : 'Weight'}</Text>
+                <Text style={styles.sectionTitle}>Select {isEgg ? 'Pack Size' : isPcUnit ? 'Quantity' : 'Weight'}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weightOptions}>
                   {weightOptions.map((weight) => (
                     <TouchableOpacity
@@ -171,7 +197,7 @@ export default function ProductDetailScreen() {
                           effectiveWeight === weight && styles.weightOptionTextActive,
                         ]}
                       >
-                        {weight} {isPcUnit ? 'pc' : 'kg'}
+                        {weight} {isPcUnit ? 'PC' : 'kg'}
                       </Text>
                       {effectiveWeight === weight && <View style={styles.activeDot} />}
                     </TouchableOpacity>
@@ -214,6 +240,54 @@ export default function ProductDetailScreen() {
                   </View>
                 </View>
               )}
+
+              {/* Reviews Section */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Customer Reviews</Text>
+                  <TouchableOpacity 
+                    style={styles.reviewBtn}
+                    onPress={() => user ? setReviewModalVisible(true) : alert('Please log in to leave a review')}
+                  >
+                    <MessageSquare size={16} color={Colors.tealBlue} />
+                    <Text style={styles.reviewBtnText}>Write a Review</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {reviews.length === 0 ? (
+                  <View style={styles.emptyReviews}>
+                    <Text style={styles.emptyReviewsText}>No reviews yet. Be the first to share your thoughts!</Text>
+                  </View>
+                ) : (
+                  <View style={styles.reviewsList}>
+                    {reviews.map((review) => (
+                      <View key={review.id} style={styles.reviewCard}>
+                        <View style={styles.reviewHeader}>
+                          <Text style={styles.reviewerName}>{review.user_name}</Text>
+                          <View style={styles.reviewStars}>
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                size={12}
+                                fill={i < review.rating ? Colors.orange : 'transparent'}
+                                color={i < review.rating ? Colors.orange : '#CCC'}
+                              />
+                            ))}
+                          </View>
+                        </View>
+                        <Text style={styles.reviewComment}>{review.comment}</Text>
+                        <Text style={styles.reviewDate}>
+                          {new Date(review.created_at).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
 
               <View style={{ height: 100 }} />
             </View>
@@ -258,6 +332,14 @@ export default function ProductDetailScreen() {
         variants={product.variants}
         weight={cartWeight}
         title={product.variants && product.variants.length > 0 ? "Select Type" : "Select Cutting Type"}
+      />
+
+      <ReviewModal
+        visible={reviewModalVisible}
+        onClose={() => setReviewModalVisible(false)}
+        productId={product.id}
+        userId={user?.uid || ''}
+        userName={user?.displayName || 'Customer'}
       />
     </View>
   );
@@ -682,5 +764,97 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold' as const,
     color: Colors.white,
+  },
+  ratingOverview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFF4E6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  ratingValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.orange,
+  },
+  ratingCount: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '500',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  reviewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.tealBlue.substring(0, 7) + '10',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.tealBlue.substring(0, 7) + '20',
+  },
+  reviewBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.tealBlue,
+  },
+  emptyReviews: {
+    padding: 24,
+    backgroundColor: '#F9F9F9',
+    borderRadius: 16,
+    alignItems: 'center',
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: '#CCC',
+  },
+  emptyReviewsText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  reviewsList: {
+    gap: 16,
+  },
+  reviewCard: {
+    backgroundColor: Colors.white,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  reviewerName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.charcoal,
+  },
+  reviewStars: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  reviewComment: {
+    fontSize: 14,
+    color: '#555',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  reviewDate: {
+    fontSize: 11,
+    color: '#AAA',
+    fontWeight: '600',
   },
 });

@@ -8,13 +8,13 @@ import {
     ScrollView,
     SafeAreaView,
     Linking,
-    TextInput,
     KeyboardAvoidingView,
     Platform,
     Image,
     useWindowDimensions,
+    Animated,
 } from 'react-native';
-import { X, Send, Phone, MessageCircle, ChevronLeft } from 'lucide-react-native';
+import { X, Send, Phone, MessageCircle, ChevronLeft, Sparkles, Headset } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 
 interface SupportChatModalProps {
@@ -40,9 +40,13 @@ const INITIAL_OPTIONS = [
 
 export default function SupportChatModal({ visible, onClose }: SupportChatModalProps) {
     const [messages, setMessages] = useState<Message[]>([]);
+    const [isTyping, setIsTyping] = useState(false);
     const scrollViewRef = useRef<ScrollView>(null);
     const { width: windowWidth } = useWindowDimensions();
     const isLargeScreen = windowWidth >= 768;
+
+    // Animation for online dot
+    const dotOpacity = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
         if (visible) {
@@ -56,6 +60,22 @@ export default function SupportChatModal({ visible, onClose }: SupportChatModalP
                     options: INITIAL_OPTIONS,
                 },
             ]);
+
+            // Start dot animation
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(dotOpacity, {
+                        toValue: 0.3,
+                        duration: 800,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(dotOpacity, {
+                        toValue: 1,
+                        duration: 800,
+                        useNativeDriver: true,
+                    }),
+                ])
+            ).start();
         }
     }, [visible]);
 
@@ -69,9 +89,11 @@ export default function SupportChatModal({ visible, onClose }: SupportChatModalP
         };
 
         setMessages((prev) => [...prev, userMsg]);
+        setIsTyping(true);
 
         // Simulate bot response
         setTimeout(() => {
+            setIsTyping(false);
             let botResponse: Message;
 
             switch (option.value) {
@@ -162,81 +184,113 @@ export default function SupportChatModal({ visible, onClose }: SupportChatModalP
                     };
             }
             setMessages((prev) => [...prev, botResponse]);
-        }, 600);
+        }, 1200);
     };
 
     if (!visible) return null;
 
     return (
-        <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" transparent={isLargeScreen}>
-            <View style={isLargeScreen ? styles.modalOverlay : null}>
-                <SafeAreaView style={[styles.container, isLargeScreen && styles.largeContainer]}>
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                            <ChevronLeft size={28} color={Colors.charcoal} />
-                        </TouchableOpacity>
-                        <View style={styles.headerTitleContainer}>
-                            <Text style={styles.headerTitle}>Support Chat</Text>
-                            <View style={styles.onlineStatus}>
-                                <View style={styles.onlineDot} />
-                                <Text style={styles.onlineText}>Online</Text>
-                            </View>
-                        </View>
-                        <View style={{ width: 28 }} />
-                    </View>
-
-                    {/* Chat Area */}
-                    <ScrollView
-                        ref={scrollViewRef}
-                        style={styles.chatContainer}
-                        contentContainerStyle={styles.chatContent}
-                        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-                    >
-                        {messages.map((msg) => (
-                            <View key={msg.id} style={[
-                                styles.messageWrapper,
-                                msg.sender === 'user' ? styles.userMessageWrapper : styles.botMessageWrapper
-                            ]}>
-                                {msg.sender === 'bot' && (
-                                    <View style={styles.botAvatar}>
-                                        <MessageCircle size={16} color={Colors.white} />
-                                    </View>
-                                )}
-
-                                <View>
-                                    <View style={[
-                                        styles.messageBubble,
-                                        msg.sender === 'user' ? styles.userBubble : styles.botBubble
-                                    ]}>
-                                        <Text style={[
-                                            styles.messageText,
-                                            msg.sender === 'user' ? styles.userText : styles.botText
-                                        ]}>
-                                            {msg.text}
-                                        </Text>
-                                    </View>
-
-                                    {/* Options */}
-                                    {msg.type === 'options' && msg.options && (
-                                        <View style={styles.optionsContainer}>
-                                            {msg.options.map((option, index) => (
-                                                <TouchableOpacity
-                                                    key={index}
-                                                    style={styles.optionButton}
-                                                    onPress={() => handleOptionSelect(option)}
-                                                    disabled={messages[messages.length - 1].id !== msg.id} // Disable old options
-                                                >
-                                                    <Text style={styles.optionText}>{option.label}</Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </View>
-                                    )}
+        <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" transparent={isLargeScreen} onRequestClose={onClose}>
+            <View style={[styles.modalWrapper, isLargeScreen && styles.modalOverlay]}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={[styles.container, isLargeScreen && styles.largeContainer]}
+                >
+                    <SafeAreaView style={styles.safeArea}>
+                        {/* Header */}
+                        <View style={styles.header}>
+                            <TouchableOpacity onPress={onClose} style={styles.headerSide}>
+                                <View style={styles.backButtonCircle}>
+                                    <ChevronLeft size={24} color={Colors.deepTeal} />
+                                </View>
+                            </TouchableOpacity>
+                            <View style={styles.headerTitleContainer}>
+                                <Text style={styles.headerTitle}>Meat UP Support</Text>
+                                <View style={styles.onlineStatus}>
+                                    <Animated.View style={[styles.onlineDot, { opacity: dotOpacity }]} />
+                                    <Text style={styles.onlineText}>Support is Online</Text>
                                 </View>
                             </View>
-                        ))}
-                    </ScrollView>
-                </SafeAreaView>
+                            <View style={styles.headerSide}>
+                                <TouchableOpacity style={styles.headerIconBtn} onPress={() => Linking.openURL('tel:+918281626692')}>
+                                    <Phone size={20} color={Colors.deepTeal} />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Chat Area */}
+                        <ScrollView
+                            ref={scrollViewRef}
+                            style={styles.chatContainer}
+                            contentContainerStyle={styles.chatContent}
+                            onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+                            showsVerticalScrollIndicator={false}
+                        >
+                            {messages.map((msg, index) => (
+                                <View key={msg.id} style={[
+                                    styles.messageWrapper,
+                                    msg.sender === 'user' ? styles.userMessageWrapper : styles.botMessageWrapper
+                                ]}>
+                                    {msg.sender === 'bot' && (
+                                        <View style={styles.botAvatar}>
+                                            <Headset size={16} color={Colors.white} />
+                                        </View>
+                                    )}
+
+                                    <View style={styles.messageContent}>
+                                        <View style={[
+                                            styles.messageBubble,
+                                            msg.sender === 'user' ? styles.userBubble : styles.botBubble,
+                                            // Subtle radius adjustments for consecutive messages would go here
+                                        ]}>
+                                            <Text style={[
+                                                styles.messageText,
+                                                msg.sender === 'user' ? styles.userText : styles.botText
+                                            ]}>
+                                                {msg.text}
+                                            </Text>
+                                        </View>
+
+                                        {/* Options */}
+                                        {msg.type === 'options' && msg.options && (
+                                            <View style={styles.optionsContainer}>
+                                                {msg.options.map((option, idx) => (
+                                                    <TouchableOpacity
+                                                        key={idx}
+                                                        style={[
+                                                            styles.optionButton,
+                                                            messages[messages.length - 1].id !== msg.id && styles.optionButtonDisabled
+                                                        ]}
+                                                        onPress={() => handleOptionSelect(option)}
+                                                        disabled={messages[messages.length - 1].id !== msg.id}
+                                                    >
+                                                        <Text style={[
+                                                            styles.optionText,
+                                                            messages[messages.length - 1].id !== msg.id && styles.optionTextDisabled
+                                                        ]}>
+                                                            {option.label}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </View>
+                                        )}
+                                    </View>
+                                </View>
+                            ))}
+
+                            {isTyping && (
+                                <View style={styles.botMessageWrapper}>
+                                    <View style={styles.botAvatar}>
+                                        <Headset size={16} color={Colors.white} />
+                                    </View>
+                                    <View style={[styles.messageBubble, styles.botBubble, styles.typingBubble]}>
+                                        <Text style={styles.typingText}>Meat Up is typing...</Text>
+                                    </View>
+                                </View>
+                            )}
+                        </ScrollView>
+                    </SafeAreaView>
+                </KeyboardAvoidingView>
             </View>
         </Modal>
     );
@@ -245,72 +299,111 @@ export default function SupportChatModal({ visible, onClose }: SupportChatModalP
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F9F9F9',
+        backgroundColor: Colors.cream, // Premium background
+    },
+    modalWrapper: {
+        flex: 1,
     },
     modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(0,0,0,0.4)',
         justifyContent: 'center',
         alignItems: 'center',
     },
+    safeArea: {
+        flex: 1,
+    },
     largeContainer: {
-        maxWidth: 600,
-        maxHeight: '80%',
-        width: '90%',
-        borderRadius: 24,
+        maxWidth: 500,
+        maxHeight: '85%',
+        width: '95%',
+        borderRadius: 32,
         overflow: 'hidden',
+        backgroundColor: Colors.cream,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.3,
+        shadowRadius: 24,
+        elevation: 15,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: Colors.deepTeal,
+        paddingHorizontal: 20,
+        paddingVertical: 18,
+        backgroundColor: Colors.white,
         borderBottomWidth: 1,
-        borderBottomColor: Colors.deepTeal,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+        zIndex: 10,
     },
-    closeBtn: {
-        padding: 4,
-        color: Colors.cream,
+    headerSide: {
+        width: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    backButtonCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: Colors.cream,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerIconBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: Colors.cream,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitleContainer: {
         alignItems: 'center',
     },
     headerTitle: {
         fontSize: 18,
-        fontWeight: '700',
-        color: Colors.cream
+        fontWeight: '800',
+        color: Colors.deepTeal,
+        letterSpacing: 0.3,
     },
     onlineStatus: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 2,
+        marginTop: 4,
     },
     onlineDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
         backgroundColor: '#4CAF50',
-        marginRight: 4,
+        marginRight: 6,
     },
     onlineText: {
         fontSize: 12,
-        color: '#dededeff',
+        color: '#666',
+        fontWeight: '600',
     },
     chatContainer: {
         flex: 1,
     },
     chatContent: {
-        padding: 16,
-        gap: 16,
+        padding: 20,
+        gap: 20,
         paddingBottom: 40,
     },
     messageWrapper: {
         flexDirection: 'row',
         alignItems: 'flex-end',
-        gap: 8,
-        maxWidth: '85%',
+        gap: 12,
+        maxWidth: '90%',
+    },
+    messageContent: {
+        flexShrink: 1,
     },
     userMessageWrapper: {
         alignSelf: 'flex-end',
@@ -318,34 +411,52 @@ const styles = StyleSheet.create({
     },
     botMessageWrapper: {
         alignSelf: 'flex-start',
+        flexDirection: 'row',
+        gap: 12,
+        alignItems: 'flex-end',
+        maxWidth: '90%',
     },
     botAvatar: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: Colors.deepTeal,
         alignItems: 'center',
         justifyContent: 'center',
+        shadowColor: Colors.deepTeal,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 3,
     },
     messageBubble: {
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderRadius: 20,
-        borderTopLeftRadius: 4,
+        paddingHorizontal: 18,
+        paddingVertical: 14,
+        borderRadius: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.03,
+        shadowRadius: 4,
+        elevation: 1,
     },
     userBubble: {
         backgroundColor: Colors.deepTeal,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 4,
+        borderBottomRightRadius: 4,
     },
     botBubble: {
         backgroundColor: Colors.white,
+        borderBottomLeftRadius: 4,
         borderWidth: 1,
-        borderColor: '#eee',
+        borderColor: 'rgba(0,0,0,0.03)',
+    },
+    typingBubble: {
+        backgroundColor: 'rgba(255,255,255,0.7)',
+        paddingVertical: 10,
     },
     messageText: {
         fontSize: 15,
         lineHeight: 22,
+        fontWeight: '500',
     },
     userText: {
         color: Colors.white,
@@ -353,23 +464,42 @@ const styles = StyleSheet.create({
     botText: {
         color: Colors.charcoal,
     },
+    typingText: {
+        fontSize: 13,
+        color: '#888',
+        fontStyle: 'italic',
+    },
     optionsContainer: {
-        marginTop: 10,
+        marginTop: 12,
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 8,
     },
     optionButton: {
         backgroundColor: Colors.white,
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: Colors.tealBlue,
+        paddingVertical: 12,
+        paddingHorizontal: 18,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: Colors.deepTeal,
+        shadowColor: Colors.deepTeal,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    optionButtonDisabled: {
+        borderColor: '#EEE',
+        backgroundColor: '#F5F5F5',
+        shadowOpacity: 0,
+        elevation: 0,
     },
     optionText: {
-        color: Colors.tealBlue,
+        color: Colors.deepTeal,
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '700',
+    },
+    optionTextDisabled: {
+        color: '#AAA',
     },
 });

@@ -38,7 +38,7 @@ export default function OrdersScreen() {
   const isTablet = windowWidth >= 768;
   const contentMaxWidth = 1200;
 
-  const { orders, cancelOrder } = useApp();
+  const { orders, cancelOrder, setIsSignInModalVisible, user } = useApp();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [chatVisible, setChatVisible] = React.useState(false);
@@ -46,6 +46,10 @@ export default function OrdersScreen() {
   const [selectedOrderId, setSelectedOrderId] = React.useState<string | null>(null);
 
   const handleSupportPress = () => {
+    if (user.id === '1') {
+      setIsSignInModalVisible(true);
+      return;
+    }
     setChatVisible(true);
   };
 
@@ -195,7 +199,7 @@ function OrderCard({
             <Text style={styles.itemText} numberOfLines={1}>
               <Text style={{ fontWeight: '700' }}>{item.quantity}x </Text>
               {item.name}
-              <Text style={{ color: '#888' }}> ({item.weight}kg{item.cuttingType ? ` • ${item.cuttingType}` : ''})</Text>
+              <Text style={{ color: '#888' }}> ({item.weight}{item.name.toLowerCase().includes('egg') || item.unit?.toLowerCase() === 'pc' || item.unit?.toLowerCase() === 'pack' ? 'PC' : 'kg'}{item.cuttingType ? ` • ${item.cuttingType}` : ''})</Text>
             </Text>
           </View>
         ))}

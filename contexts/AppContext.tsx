@@ -25,6 +25,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const ordersRef = useRef<Order[]>([]); // Ref to track orders for interval without stale closures
   const [walletHistory, setWalletHistory] = useState<WalletTransaction[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [isSignInModalVisible, setIsSignInModalVisible] = useState(false);
 
   // Keep ref in sync
   useEffect(() => {
@@ -51,6 +52,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
               is_first_order_completed: profile.is_first_order_completed,
               wallet_points: profile.wallet_points,
               created_at: profile.created_at,
+              addresses: profile.addresses || [],
             });
           }
         });
@@ -183,10 +185,14 @@ export const [AppProvider, useApp] = createContextHook(() => {
   const placeOrder = async (
     address: string,
     deliverySlot: string,
+    paymentMode: 'online' | 'cod',
     walletUsed: number = 0,
     note?: string,
     deliveryCharge: number = 0,
-    paymentDetails?: { payment_id: string; razorpay_order_id: string }
+    paymentDetails?: { payment_id: string; razorpay_order_id: string },
+    taxAmount: number = 0,
+    platformFee: number = 0,
+    discount: number = 0
   ) => {
     if (!user.id) return;
     if (walletUsed > user.wallet_points) {
@@ -195,16 +201,7 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
     try {
       const subtotal = cartTotal;
-      const discount = 0; // Implement discount logic if needed
-      // Note: firstOrderDiscount is calculated in checkout, so we might need to pass finalAmount directly or recalculate here.
-      // However, current implementation seems to calculate `finalAmount` internally.
-      // Let's assume for now that standard discount logic is handled differently or we are just persisting values.
-      // But based on Checkout.tsx: `finalTotal = cartTotal + tax - discount - wallet + delivery`.
-      // The `placeOrder` function calculates `finalAmount = subtotal - discount - walletUsed`. This is missing tax and deliveryCharge.
-      // We should update `finalAmount` calculation here to be accurate or accept it as parameter.
-      // For minimal invasive change, let's update calculation here to include deliveryCharge.
-
-      const finalAmount = subtotal - discount - walletUsed + deliveryCharge;
+      const finalAmount = subtotal + taxAmount + platformFee + deliveryCharge - discount - walletUsed;
 
       // Chicken Points: 1 point per 1 kg (total weight)
       // ... existing code ...
@@ -218,26 +215,36 @@ export const [AppProvider, useApp] = createContextHook(() => {
             const variant = item.product.variants.find(v => v.name === item.cuttingType);
             if (variant) itemPrice = variant.price;
           }
+
+          const isKgUnit = item.product.unit?.toLowerCase() === 'kg';
+          const effectivePrice = isKgUnit ? itemPrice * item.weight : itemPrice;
+
           return {
             product_id: item.product.id,
             name: item.product.name,
             quantity: item.quantity,
             weight: item.weight,
-            price: itemPrice,
+            price: effectivePrice, // Now stores price for the selected weight
+            unit: item.product.unit,
+            price_per_selection: true, // Flag for backward compatibility
             ...(item.cuttingType ? { cuttingType: item.cuttingType } : {}),
           };
         }),
         total_amount: subtotal,
         discount,
+        tax_amount: taxAmount,
+        platform_fee: platformFee,
         delivery_charge: deliveryCharge, // Added field
         wallet_used: walletUsed,
         final_amount: finalAmount,
         earned_points: Math.floor(cart.reduce((sum, item) => {
-          if (item.product.unit === 'PC' || item.product.unit === 'pack') return sum;
+          const isPcUnit = item.product.unit?.toLowerCase() === 'pc' || item.product.unit?.toLowerCase() === 'pack' || item.product.name.toLowerCase().includes('egg');
+          if (isPcUnit) return sum;
           return sum + item.weight * item.quantity;
         }, 0)),
         address,
         delivery_slot: deliverySlot,
+        payment_mode: paymentMode,
         note,
         ...(paymentDetails ? {
           payment_id: paymentDetails.payment_id,
@@ -256,7 +263,6 @@ export const [AppProvider, useApp] = createContextHook(() => {
 
       clearCart();
       return result;
-      return result;
     } catch (e) {
       console.error("Order Failed", e);
       throw e;
@@ -271,6 +277,8 @@ export const [AppProvider, useApp] = createContextHook(() => {
     products,
     cartTotal,
     cartItemCount,
+    isSignInModalVisible,
+    setIsSignInModalVisible,
     addToCart,
     removeFromCart,
     updateCartItemPrice,
@@ -280,6 +288,27 @@ export const [AppProvider, useApp] = createContextHook(() => {
       if (!user.id) return;
       await UserService.updateUser(user.id, data);
       setUser((prev: User) => ({ ...prev, ...data }));
+    },
+    addAddress: async (label: string, details: string) => {
+      if (!user.id) return;
+      const newAddress = { id: Date.now().toString(), label, details };
+      const updatedAddresses = [...(user.addresses || []), newAddress];
+      await UserService.updateUser(user.id, { addresses: updatedAddresses });
+      setUser((prev: User) => ({ ...prev, addresses: updatedAddresses }));
+    },
+    removeAddress: async (addressId: string) => {
+      if (!user.id) return;
+      const updatedAddresses = (user.addresses || []).filter(a => a.id !== addressId);
+      await UserService.updateUser(user.id, { addresses: updatedAddresses });
+      setUser((prev: User) => ({ ...prev, addresses: updatedAddresses }));
+    },
+    updateAddress: async (addressId: string, label: string, details: string) => {
+      if (!user.id) return;
+      const updatedAddresses = (user.addresses || []).map(a => 
+        a.id === addressId ? { ...a, label, details } : a
+      );
+      await UserService.updateUser(user.id, { addresses: updatedAddresses });
+      setUser((prev: User) => ({ ...prev, addresses: updatedAddresses }));
     },
     cancelOrder: async (orderId: string) => {
       const order = orders.find(o => o.id === orderId);

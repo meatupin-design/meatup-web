@@ -69,8 +69,8 @@ export default function HomeScreen() {
     if (eggProduct && eggProduct.variants && eggProduct.variants.some((v: any) => v.price > 10)) {
       import('@/services/ProductService').then(({ ProductService }) => {
         ProductService.updateProduct(eggProduct.id, {
-          price_quantity: 6,
-          unit: 'pc',
+          price_quantity: 1,
+          unit: 'PC',
           variants: [
             { name: 'White Egg', price: 6 },
             { name: 'Brown Egg', price: 7 }
@@ -469,11 +469,11 @@ function ProductCard({
   const cardWidth = numColumns > 1 ? (availableWidth - (gap * (numColumns - 1))) / numColumns : '100%';
 
   const priceQty = product.price_quantity || 1;
-  const isPcUnit = product.unit?.toLowerCase() === 'pc' || product.unit?.toLowerCase() === 'pack';
+  const isPcUnit = product.unit?.toLowerCase() === 'pc' || product.unit?.toLowerCase() === 'pack' || product.name.toLowerCase().includes('egg');
 
   const getDefaultWeight = () => {
     if (product.name.toLowerCase().includes('egg')) return 6;
-    if (product.unit?.toLowerCase() === 'kg') return 0.5;
+    if (product.unit?.toLowerCase() === 'kg') return 1;
     if (product.unit?.toLowerCase() === 'g') return 250;
     if (isPcUnit) return 1 * priceQty;
     return 1;
@@ -482,7 +482,7 @@ function ProductCard({
   const [selectedWeight, setSelectedWeight] = useState(getDefaultWeight());
 
   // Convert display weight to cart weight
-  const cartWeight = selectedWeight; // The selected weight (6, 12, 30) is the actual count for Eggs, no need to divide here.
+  const cartWeight = selectedWeight; 
   const quantity = quantityInCart(cartWeight);
 
   const getOptions = () => {
@@ -521,7 +521,7 @@ function ProductCard({
           <Text style={styles.cardTitle}>{product.name}</Text>
           <View style={styles.priceTag}>
             <Text style={styles.priceTagText}>₹{product.current_price}</Text>
-            <Text style={styles.priceUnit}>/{product.unit}</Text>
+            <Text style={styles.priceUnit}>/{isPcUnit ? 'PC' : product.unit}</Text>
           </View>
         </View>
 
@@ -531,7 +531,7 @@ function ProductCard({
         <View style={styles.variantContainer}>
           {options.map((opt) => {
             const label = isPcUnit
-              ? `${opt} ${product.unit}`
+              ? `${opt} PC`
               : `${opt} ${product.unit}`;
             const isSelected = selectedWeight === opt;
 

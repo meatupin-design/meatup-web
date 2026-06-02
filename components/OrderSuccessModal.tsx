@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, Modal, TouchableOpacity, Animated, Dimensions, useWindowDimensions } from 'react-native';
-import { CheckCircle, ArrowRight, ShoppingBag } from 'lucide-react-native';
+import { StyleSheet, Text, View, Modal, TouchableOpacity, Animated, Dimensions, useWindowDimensions, Linking, Alert } from 'react-native';
+import { CheckCircle, ArrowRight, ShoppingBag, MessageCircle } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useRouter } from 'expo-router';
 
@@ -172,3 +172,4 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 });
+

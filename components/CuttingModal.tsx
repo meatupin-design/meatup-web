@@ -65,7 +65,7 @@ export default function CuttingModal({ visible, onClose, onSelect, options, vari
                                         >
                                             <View style={styles.optionRow}>
                                                 <Text style={styles.optionText}>{variant.name}</Text>
-                                                <Text style={styles.optionPrice}>₹{(variant.price).toFixed(2)}/pc</Text>
+                                                <Text style={styles.optionPrice}>₹{(variant.price).toFixed(2)}/PC</Text>
                                             </View>
                                         </TouchableOpacity>
                                         );

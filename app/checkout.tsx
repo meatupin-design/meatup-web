@@ -20,18 +20,18 @@ import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
-import { calculateDistance, calculateDeliveryTime, STORE_LOCATION } from '@/utils/locationUtils';
+import { calculateDistance, calculateDeliveryTime, STORE_LOCATION, getGoogleMapsDistance } from '@/utils/locationUtils';
 import OrderSuccessModal from '@/components/OrderSuccessModal';
 import RazorpayCheckoutGateway from '@/components/RazorpayCheckoutGateway';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '@/config/firebaseConfig';
+import { app, firebaseConfig } from '@/config/firebaseConfig';
 
 export default function CheckoutScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isLargeScreen = width >= 1024;
-  const { cart, cartTotal, user, placeOrder } = useApp();
+  const { cart, cartTotal, user, placeOrder, setIsSignInModalVisible, addAddress } = useApp();
   const [address, setAddress] = useState(user.address || '');
   const [useWalletPoints, setUseWalletPoints] = useState(false);
   const [note, setNote] = useState('');
@@ -40,17 +40,22 @@ export default function CheckoutScreen() {
   const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('cod');
   const [showRazorpayGateway, setShowRazorpayGateway] = useState(false);
   const [currentRazorpayOrderId, setCurrentRazorpayOrderId] = useState('');
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const [saveAddressLabel, setSaveAddressLabel] = useState('Home');
 
   const [locationLoading, setLocationLoading] = useState(false);
   const [deliveryDistance, setDeliveryDistance] = useState<number | null>(null);
   const [deliveryTime, setDeliveryTime] = useState<number | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
 
-  const firstOrderDiscount = !user.is_first_order_completed ? cartTotal * 0.1 : 0;
 
   // Tax Calculation
   const taxRate = 0.05; // 5% for now
   const taxAmount = cartTotal * taxRate;
+
+  // Platform Fee Calculation
+  const platformFeeRate = 0.00; // 0%
+  const platformFeeAmount = cartTotal * platformFeeRate;
 
   // Delivery Charge Calculation
   const freeDistance = 7;
@@ -61,10 +66,32 @@ export default function CheckoutScreen() {
     deliveryCharge = Math.ceil((deliveryDistance - freeDistance) * ratePerKm);
   }
 
-  const maxWalletRedemption = Math.min(user.wallet_points, cartTotal - firstOrderDiscount + taxAmount + deliveryCharge);
+  const maxWalletRedemption = Math.min(user.wallet_points, cartTotal + taxAmount + platformFeeAmount + deliveryCharge);
   const walletDeduction = useWalletPoints ? maxWalletRedemption : 0;
 
-  const finalTotal = Math.max(0, cartTotal + taxAmount + deliveryCharge - firstOrderDiscount - walletDeduction);
+  const finalTotal = Math.max(0, cartTotal + taxAmount + platformFeeAmount + deliveryCharge - walletDeduction);
+
+  const isAddressNew = React.useMemo(() => {
+    if (!address.trim() || user.id === '1') return false;
+    const existingDetails = [
+      user.address,
+      ...(user.addresses || []).map(a => a.details)
+    ].filter(Boolean);
+    return !existingDetails.includes(address.trim());
+  }, [address, user]);
+
+  const handleSaveCurrentAddress = async () => {
+    if (!address.trim() || user.id === '1') return;
+    setIsSavingAddress(true);
+    try {
+      await addAddress(saveAddressLabel, address.trim());
+      Alert.alert('Success', 'Address saved to your profile.');
+    } catch (e) {
+      Alert.alert('Error', 'Failed to save address.');
+    } finally {
+      setIsSavingAddress(false);
+    }
+  };
 
   useEffect(() => {
     // Attempt to get location on mount if address is empty or just to check
@@ -96,12 +123,33 @@ export default function CheckoutScreen() {
       let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const { latitude, longitude } = location.coords;
 
-      const dist = calculateDistance(
+      // Use Google Maps for real road distance if possible
+      const googleData = await getGoogleMapsDistance(
         latitude,
         longitude,
         STORE_LOCATION.latitude,
-        STORE_LOCATION.longitude
+        STORE_LOCATION.longitude,
+        firebaseConfig.apiKey
       );
+
+      let dist: number;
+      let time: number;
+
+      if (googleData) {
+        dist = googleData.distanceKm;
+        time = calculateDeliveryTime(dist, true); // Already road distance
+      } else {
+        // Fallback to Haversine straight-line estimation
+        const straightDist = calculateDistance(
+          latitude,
+          longitude,
+          STORE_LOCATION.latitude,
+          STORE_LOCATION.longitude
+        );
+        // Estimate road distance (1.4x) for display as well
+        dist = straightDist * 1.4;
+        time = calculateDeliveryTime(straightDist, false);
+      }
 
       if (dist > 20) {
         setDeliveryDistance(null);
@@ -109,7 +157,7 @@ export default function CheckoutScreen() {
         setLocationError('Delivery is currently unavailable in your area (Max 20km).');
       } else {
         setDeliveryDistance(parseFloat(dist.toFixed(1)));
-        setDeliveryTime(calculateDeliveryTime(dist));
+        setDeliveryTime(time);
       }
 
       if (!address) {
@@ -188,12 +236,34 @@ export default function CheckoutScreen() {
       }
 
       const { lat, lon } = coords;
-      const dist = calculateDistance(
+      
+      // Use Google Maps for real road distance if possible
+      const googleData = await getGoogleMapsDistance(
         lat,
         lon,
         STORE_LOCATION.latitude,
-        STORE_LOCATION.longitude
+        STORE_LOCATION.longitude,
+        firebaseConfig.apiKey
       );
+
+      let dist: number;
+      let time: number;
+
+      if (googleData) {
+        dist = googleData.distanceKm;
+        time = calculateDeliveryTime(dist, true); // Already road distance
+      } else {
+        // Fallback to Haversine straight-line estimation
+        const straightDist = calculateDistance(
+          lat,
+          lon,
+          STORE_LOCATION.latitude,
+          STORE_LOCATION.longitude
+        );
+        // Estimate road distance (1.4x) for display as well
+        dist = straightDist * 1.4;
+        time = calculateDeliveryTime(straightDist, false);
+      }
 
       if (dist > 20) {
         setDeliveryDistance(null);
@@ -201,7 +271,7 @@ export default function CheckoutScreen() {
         setLocationError('Delivery is currently unavailable in your area (Max 20km).');
       } else {
         setDeliveryDistance(parseFloat(dist.toFixed(1)));
-        setDeliveryTime(calculateDeliveryTime(dist));
+        setDeliveryTime(time);
       }
 
     } catch (error) {
@@ -213,6 +283,11 @@ export default function CheckoutScreen() {
   };
 
   const handlePlaceOrder = async () => {
+    if (user.id === '1') {
+      setIsSignInModalVisible(true);
+      return;
+    }
+
     if (!address.trim()) {
       Alert.alert('Error', 'Please enter delivery address');
       return;
@@ -224,7 +299,7 @@ export default function CheckoutScreen() {
 
     if (paymentMethod === 'cod') {
       try {
-        const result = await placeOrder(address, slotString, walletDeduction, note, deliveryCharge);
+        const result = await placeOrder(address, slotString, paymentMethod, walletDeduction, note, deliveryCharge, undefined, taxAmount, platformFeeAmount, 0);
         if (!result) throw new Error("Order placement failed");
 
         const { display_id } = result;
@@ -250,15 +325,15 @@ export default function CheckoutScreen() {
 
         let responseData;
         const rawText = await response.text();
-        
+
         try {
-           responseData = JSON.parse(rawText);
+          responseData = JSON.parse(rawText);
         } catch (e) {
-           throw new Error(`Server returned non-JSON response: ${rawText.substring(0, 100)}`);
+          throw new Error(`Server returned non-JSON response: ${rawText.substring(0, 100)}`);
         }
 
         if (!response.ok || responseData.error) {
-           throw new Error(responseData.error || `HTTP error! status: ${response.status}`);
+          throw new Error(responseData.error || `HTTP error! status: ${response.status}`);
         }
 
         const razorpayOrderId = responseData.id;
@@ -289,7 +364,7 @@ export default function CheckoutScreen() {
         signature: data.razorpay_signature // can be saved if needed
       };
 
-      const result = await placeOrder(address, slotString, walletDeduction, note, deliveryCharge, paymentDetails);
+      const result = await placeOrder(address, slotString, 'online', walletDeduction, note, deliveryCharge, paymentDetails, taxAmount, platformFeeAmount, 0);
       if (!result) throw new Error("Order placement failed");
 
       const { display_id } = result;
@@ -332,26 +407,11 @@ export default function CheckoutScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[
-          styles.scrollContent,
           isLargeScreen && styles.largeScreenContent
         ]}>
           {/* Header/Banner Section */}
           <View style={isLargeScreen ? { marginBottom: 24 } : null}>
             {/* First Order Discount Banner */}
-            {firstOrderDiscount > 0 && (
-              <View style={styles.discountBanner}>
-                <View style={styles.discountIconContainer}>
-                  <TicketPercent size={24} color={Colors.white} />
-                </View>
-                <View style={styles.discountContent}>
-                  <Text style={styles.discountTitle}>First Order Offer Applied!</Text>
-                  <Text style={styles.discountSubtitle}>
-                    You'll save 10% on this order as a welcome gift.
-                  </Text>
-                </View>
-                <Sparkles size={24} color={Colors.cream} style={{ opacity: 0.8 }} />
-              </View>
-            )}
           </View>
 
           <View style={[
@@ -367,6 +427,38 @@ export default function CheckoutScreen() {
               <View style={styles.sectionContainer}>
                 <Text style={styles.sectionTitle}>Delivery Details</Text>
                 <View style={styles.card}>
+                  {/* Address Selection Chips */}
+                  {(() => {
+                    const allAddresses = [
+                      ...(user.address ? [{ id: 'primary', label: 'Primary', details: user.address }] : []),
+                      ...(user.addresses || [])
+                    ].filter((v, i, a) => a.findIndex(t => t.details === v.details) === i);
+
+                    if (allAddresses.length === 0) return null;
+
+                    return (
+                      <View style={styles.addressChipsContainer}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
+                          {allAddresses.map((addr) => (
+                            <TouchableOpacity
+                              key={addr.id}
+                              style={[
+                                styles.addressChip,
+                                address === addr.details && styles.activeAddressChip
+                              ]}
+                              onPress={() => setAddress(addr.details)}
+                            >
+                              <Text style={[
+                                styles.addressChipText,
+                                address === addr.details && styles.activeAddressChipText
+                              ]}>{addr.label}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    );
+                  })()}
+
                   {/* Address Input */}
                   <View style={styles.inputGroup}>
                     <View style={styles.labelRow}>
@@ -396,6 +488,32 @@ export default function CheckoutScreen() {
                       )}
                     </TouchableOpacity>
                     {locationError && <Text style={styles.errorText}>{locationError}</Text>}
+
+                    {isAddressNew && (
+                      <View style={styles.saveAddressContainer}>
+                        <View style={styles.saveAddressRow}>
+                          <TextInput
+                            style={styles.saveLabelInput}
+                            value={saveAddressLabel}
+                            onChangeText={setSaveAddressLabel}
+                            placeholder="Label (Home/Work)"
+                            maxLength={10}
+                          />
+                          <TouchableOpacity
+                            style={styles.saveAddrBtn}
+                            onPress={handleSaveCurrentAddress}
+                            disabled={isSavingAddress}
+                          >
+                            {isSavingAddress ? (
+                              <ActivityIndicator size="small" color={Colors.white} />
+                            ) : (
+                              <Text style={styles.saveAddrBtnText}>Save</Text>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                        <Text style={styles.saveHint}>Save this for future orders</Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* Delivery Estimate Badge */}
@@ -496,8 +614,8 @@ export default function CheckoutScreen() {
                         <View style={{ flex: 1, paddingHorizontal: 10 }}>
                           <Text style={styles.billItemName}>{item.product.name}</Text>
                           <Text style={styles.billItemMeta}>
-                            {item.product.unit === 'PC' || item.product.unit === 'pack'
-                              ? `${item.weight * (item.product.price_quantity || 1)}pc`
+                            {item.product.unit?.toUpperCase() === 'PC' || item.product.unit?.toLowerCase() === 'pack' || item.product.name.toLowerCase().includes('egg')
+                              ? `${item.weight}PC`
                               : `${item.weight}${item.product.unit}`} {item.cuttingType ? `• ${item.cuttingType}` : ''}
                           </Text>
                         </View>
@@ -521,18 +639,17 @@ export default function CheckoutScreen() {
                   </View>
 
                   <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Platform Fee ({(platformFeeRate * 100).toFixed(0)}%)</Text>
+                    <Text style={styles.summaryValue}>+₹{platformFeeAmount.toFixed(2)}</Text>
+                  </View>
+
+                  <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Delivery Charge</Text>
                     <Text style={[styles.summaryValue, deliveryCharge === 0 && { color: Colors.priceUp }]}>
                       {deliveryCharge === 0 ? 'Free' : `+₹${deliveryCharge.toFixed(2)}`}
                     </Text>
                   </View>
 
-                  {firstOrderDiscount > 0 && (
-                    <View style={styles.summaryRow}>
-                      <Text style={[styles.summaryLabel, { color: Colors.priceUp }]}>New User Discount</Text>
-                      <Text style={[styles.summaryValue, { color: Colors.priceUp }]}>-₹{firstOrderDiscount.toFixed(2)}</Text>
-                    </View>
-                  )}
 
                   {useWalletPoints && walletDeduction > 0 && (
                     <View style={styles.summaryRow}>
@@ -707,15 +824,18 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   leftColumn: {
-    flex: 1,
+    width: '100%',
   },
   largeLeftColumn: {
-    flex: 1.6, // Allocate more space to details
+    flex: 1.6,
+    width: 'auto',
   },
   rightColumn: {
-    flex: 1,
+    width: '100%',
   },
   largeRightColumn: {
+    flex: 1,
+    width: 'auto',
     position: Platform.OS === 'web' ? 'sticky' : 'relative' as any,
     top: 20,
   },
@@ -1100,5 +1220,75 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
     marginTop: 2,
-  }
+  },
+  addressChipsContainer: {
+    marginBottom: 16,
+  },
+  chipsScroll: {
+    paddingHorizontal: 4,
+    gap: 10,
+  },
+  addressChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#EEE',
+  },
+  activeAddressChip: {
+    backgroundColor: Colors.deepTeal.substring(0, 7) + '15',
+    borderColor: Colors.deepTeal,
+  },
+  addressChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+  },
+  activeAddressChipText: {
+    color: Colors.deepTeal,
+  },
+  saveAddressContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: Colors.deepTeal.substring(0, 7) + '05',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.deepTeal.substring(0, 7) + '15',
+  },
+  saveAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  saveLabelInput: {
+    flex: 1,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: Colors.charcoal,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  saveAddrBtn: {
+    backgroundColor: Colors.deepTeal,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveAddrBtnText: {
+    color: Colors.white,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  saveHint: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 6,
+    marginLeft: 4,
+  },
 });

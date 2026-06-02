@@ -88,9 +88,11 @@ export default function OrderDetailScreen() {
     const StatusIcon = config.icon;
     const currentStatusIndex = ALL_STATUSES.indexOf(order.status);
     const hasPaymentId = !!order.payment_id || !!order.razorpay_order_id;
+    const isOnline = order.payment_mode === 'online' || (order.payment_mode === undefined && hasPaymentId);
+    const isCOD = order.payment_mode === 'cod' || (order.payment_mode === undefined && !hasPaymentId);
 
-    const taxRate = 0;
-    const taxAmount = order.total_amount * taxRate;
+    const taxAmount = order.tax_amount ?? 0;
+    const platformFee = order.platform_fee ?? 0;
     const deliveryCharge = order.delivery_charge ?? 0;
 
     const handleCallSupport = () => {
@@ -234,11 +236,13 @@ export default function OrderDetailScreen() {
                                             <View style={{ flex: 1 }}>
                                                 <Text style={styles.itemName}>{item.name}</Text>
                                                 <Text style={styles.itemMeta}>
-                                                    {item.weight}kg{item.cuttingType ? ` • ${item.cuttingType}` : ''}
+                                                    {item.weight}{item.name.toLowerCase().includes('egg') || item.unit?.toLowerCase() === 'pc' || item.unit?.toLowerCase() === 'pack' ? 'PC' : 'kg'}{item.cuttingType ? ` • ${item.cuttingType}` : ''}
                                                 </Text>
                                             </View>
                                             <Text style={styles.itemPrice}>
-                                                ₹{(item.price * item.weight * item.quantity).toFixed(2)}
+                                                ₹{((item as any).price_per_selection 
+                                                    ? item.price * item.quantity 
+                                                    : item.price * item.weight * item.quantity).toFixed(2)}
                                             </Text>
                                         </View>
                                         {index < order.items.length - 1 && <View style={styles.itemDivider} />}
@@ -296,7 +300,7 @@ export default function OrderDetailScreen() {
                                 {/* Payment method row */}
                                 <View style={styles.infoRow}>
                                     <View style={styles.infoIcon}>
-                                        {hasPaymentId
+                                        {isOnline
                                             ? <CreditCard size={16} color={Colors.deepTeal} />
                                             : <Banknote size={16} color={Colors.deepTeal} />
                                         }
@@ -304,12 +308,12 @@ export default function OrderDetailScreen() {
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.infoLabel}>Payment Method</Text>
                                         <Text style={styles.infoValue}>
-                                            {hasPaymentId ? 'Online Payment (UPI)' : 'Cash on Delivery'}
+                                            {isOnline ? 'Online Payment (UPI)' : 'Cash on Delivery'}
                                         </Text>
                                     </View>
-                                    <View style={[styles.paidBadge, { backgroundColor: hasPaymentId ? '#E6F5EA' : '#FFF4E6' }]}>
-                                        <Text style={[styles.paidBadgeText, { color: hasPaymentId ? Colors.priceUp : Colors.orange }]}>
-                                            {hasPaymentId ? 'Paid' : 'COD'}
+                                    <View style={[styles.paidBadge, { backgroundColor: isOnline ? '#E6F5EA' : '#FFF4E6' }]}>
+                                        <Text style={[styles.paidBadgeText, { color: isOnline ? Colors.priceUp : Colors.orange }]}>
+                                            {isOnline ? 'Paid' : 'COD'}
                                         </Text>
                                     </View>
                                 </View>
@@ -333,6 +337,13 @@ export default function OrderDetailScreen() {
                                     <Text style={styles.billLabel}>Tax</Text>
                                     <Text style={taxAmount === 0 ? styles.billValueFree : styles.billValue}>
                                         {taxAmount === 0 ? '₹0.00' : `+₹${taxAmount.toFixed(2)}`}
+                                    </Text>
+                                </View>
+
+                                <View style={styles.billRow}>
+                                    <Text style={styles.billLabel}>Platform Fee</Text>
+                                    <Text style={platformFee === 0 ? styles.billValueFree : styles.billValue}>
+                                        {platformFee === 0 ? '₹0.00' : `+₹${platformFee.toFixed(2)}`}
                                     </Text>
                                 </View>
 
