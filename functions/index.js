@@ -4,6 +4,7 @@ const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const Razorpay = require("razorpay");
 const twilio = require("twilio");
+const nodemailer = require("nodemailer");
 
 admin.initializeApp();
 
@@ -27,6 +28,20 @@ if (RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET) {
 let client;
 if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
     client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+}
+
+const SMTP_EMAIL = process.env.SMTP_EMAIL;
+const SMTP_PASSWORD = process.env.SMTP_PASSWORD;
+
+let transporter;
+if (SMTP_EMAIL && SMTP_PASSWORD) {
+    transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: SMTP_EMAIL,
+            pass: SMTP_PASSWORD
+        }
+    });
 }
 
 /**
@@ -124,5 +139,35 @@ exports.createRazorpayOrder = onCall({ cors: true }, async (request) => {
     } catch (error) {
         logger.error("Error creating Razorpay order:", error);
         throw new HttpsError("internal", "Failed to create Razorpay order.");
+    }
+});
+
+exports.requestAccountDeletion = onCall({ cors: true }, async (request) => {
+    const identifier = request.data.identifier;
+    
+    if (!identifier) {
+        throw new HttpsError("invalid-argument", "The function must be called with an 'identifier'.");
+    }
+
+    logger.info(`Account deletion requested for identifier: ${identifier}`);
+
+    try {
+        if (!transporter) {
+            throw new HttpsError("failed-precondition", "SMTP credentials are not configured on the server.");
+        }
+
+        const mailOptions = {
+            from: SMTP_EMAIL,
+            to: 'meatup.in@gmail.com', // Admin email
+            subject: 'User Account Deletion Request',
+            text: `A user has requested account deletion.\n\nUser Identifier: ${identifier}\n\nPlease take the necessary action to delete their data within 14 days in compliance with data safety policies.`
+        };
+
+        await transporter.sendMail(mailOptions);
+        logger.info(`Account deletion request email sent for ${identifier}`);
+        return { success: true };
+    } catch (error) {
+        logger.error("Error sending deletion request email:", error);
+        throw new HttpsError("internal", "Failed to send account deletion request email.");
     }
 });

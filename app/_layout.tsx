@@ -24,6 +24,9 @@ function RootLayoutNav() {
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="signup" options={{ headerShown: false }} />
       <Stack.Screen name="phone-login" options={{ headerShown: false }} />
+      <Stack.Screen name="privacypolicy" options={{ title: "Privacy Policy" }} />
+      <Stack.Screen name="accountdeleterequest" options={{ title: "Account Deletion" }} />
+      <Stack.Screen name="accountdelete" options={{ title: "Delete My Account" }} />
     </Stack>
     <SignInPromptModal 
       visible={isSignInModalVisible} 
