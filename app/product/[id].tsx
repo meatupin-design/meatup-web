@@ -318,6 +318,9 @@ export default function ProductDetailScreen() {
                 {product.available_days && product.available_days.length > 0
                   ? getNextAvailableDay(product.available_days)
                   : product.next_available || 'Check back soon'}
+                {product.timeline_slots && product.timeline_slots.length > 0
+                  ? ` (${product.timeline_slots.join(', ')})`
+                  : ''}
               </Text>
             </View>
           )}
