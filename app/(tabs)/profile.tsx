@@ -31,6 +31,7 @@ import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBanner from '@/components/StatusBanner';
+import AppDownloadSection from '@/components/AppDownloadSection';
 
 export default function ProfileScreen() {
   const { width: windowWidth } = useWindowDimensions();
@@ -406,6 +407,10 @@ export default function ProfileScreen() {
               </View>
             )}
           </View>
+        </View>
+
+        <View style={{ maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%', paddingHorizontal: 20 }}>
+          <AppDownloadSection compact />
         </View>
 
         <View style={styles.footerContact}>

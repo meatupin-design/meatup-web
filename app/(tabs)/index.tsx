@@ -15,12 +15,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Search, TrendingUp, TrendingDown, ShoppingCart, ArrowRight, ShoppingBag, Plus, Minus, Clock, SlidersHorizontal, X, Check } from 'lucide-react-native';
+import { Search, TrendingUp, TrendingDown, ShoppingCart, ArrowRight, ShoppingBag, Plus, Minus, Clock, SlidersHorizontal, X, Check, Smartphone } from 'lucide-react-native';
 import { Modal } from 'react-native';
 import Colors from '@/constants/colors';
 import { useApp } from '@/contexts/AppContext';
 import { Product } from '@/types';
 import CuttingModal from '@/components/CuttingModal';
+import AppDownloadSection from '@/components/AppDownloadSection';
 import { getNextAvailableDay, isProductAvailableToday } from '@/utils/getNextAvailableDay';
 import { db } from '@/config/firebaseConfig';
 import { doc, onSnapshot } from 'firebase/firestore';
@@ -53,14 +54,19 @@ export default function HomeScreen() {
         .map(p => p.category.trim())
     ))];
   }, [products]);
+  const scrollViewRef = useRef<ScrollView>(null);
   const tickerPosition = useRef(new Animated.Value(0)).current;
 
-  const [storeSettings, setStoreSettings] = useState<{ opening_time?: string } | null>(null);
+  const [storeSettings, setStoreSettings] = useState<{
+    opening_time?: string;
+    play_store_url?: string;
+    apk_download_url?: string;
+  } | null>(null);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "settings", "store"), (docSnap) => {
       if (docSnap.exists()) {
-        setStoreSettings(docSnap.data() as { opening_time?: string });
+        setStoreSettings(docSnap.data() as any);
       }
     }, (err) => {
       console.log("Error loading store settings", err);
@@ -176,17 +182,31 @@ export default function HomeScreen() {
         <View style={{ maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%' }}>
           <View style={styles.headerTopRow}>
             <Text style={styles.logo}>Meat Up</Text>
-            <TouchableOpacity
-              style={styles.cartBtn}
-              onPress={() => router.push('/cart')}
-            >
-              <ShoppingCart size={24} color={Colors.cream} />
-              {cartItemCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{cartItemCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            <View style={styles.headerRightActions}>
+              <TouchableOpacity
+                style={styles.headerAppPill}
+                onPress={() => {
+                  if (scrollViewRef.current) {
+                    scrollViewRef.current.scrollToEnd({ animated: true });
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Smartphone size={14} color={Colors.deepTeal} />
+                <Text style={styles.headerAppPillText}>Get App</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cartBtn}
+                onPress={() => router.push('/cart')}
+              >
+                <ShoppingCart size={24} color={Colors.cream} />
+                {cartItemCount > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{cartItemCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.searchRow}>
@@ -264,6 +284,7 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%' }]}
         showsVerticalScrollIndicator={false}
@@ -324,6 +345,12 @@ export default function HomeScreen() {
             ))}
           </View>
         </View>
+
+        {/* 4. App Download Section (Google Play & Direct APK) */}
+        <AppDownloadSection
+          playStoreUrl={storeSettings?.play_store_url}
+          apkDownloadUrl={storeSettings?.apk_download_url}
+        />
 
         {/* Space for floating cart */}
         <View style={{ height: 100 }} />
@@ -569,6 +596,31 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.cream,
     letterSpacing: 0.5,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerAppPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.cream,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  } as any,
+  headerAppPillText: {
+    color: Colors.deepTeal,
+    fontSize: 12,
+    fontWeight: '700',
   },
   cartBtn: {
     position: 'relative',

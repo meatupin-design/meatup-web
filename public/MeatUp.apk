@@ -1,0 +1,4 @@
+PK        
+MeatUp Android Application Package (APK)
+Package Name: app.rork.meatup.delivery
+To replace this placeholder with your production APK from EAS Build, place your .apk build directly into kokomart-web/public/downloads/MeatUp.apk or update apkDownloadUrl in constants/appLinks.ts.
